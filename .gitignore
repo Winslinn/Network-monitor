@@ -1,0 +1,12 @@
+# Ignoring node modules and source files
+**/node_modules/
+**/src/
+
+# Ignoring build artifacts
+**/build/
+
+# Ignoring Python cache files and environment variables
+__pycache__/
+*.pyc
+.env
+.crt
