@@ -4,9 +4,14 @@
 
 # Ignoring build artifacts
 **/build/
+**/package-lock.json
+**/package.json
 
 # Ignoring Python cache files and environment variables
 __pycache__/
 *.pyc
 .env
 *.crt
+.vscode
+.venv
+*.code-workspace
