@@ -1,18 +1,50 @@
-import socket, asyncio, json, html, uvicorn
+import socket, asyncio, json, re
+import database as db
+
+from database import Client, session
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from multiprocessing import Queue
 
+session_db = db.session()
+
 async def watch_logs(log_queue: Queue, manager: classmethod):
     loop = asyncio.get_event_loop()
-    print("DEBUG: watch_logs task started")
+
     while True:
         try:
             log = await loop.run_in_executor(None, log_queue.get)
             
             print(f"\r\033[0;32m{log}\033[0m\n> ", end="", flush=True)
 
+            if 'dhcp1' in log:
+                mac_pattern = r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}"
+                mac_match = re.search(mac_pattern, log)
+
+                session_db.expire_all()
+                client = session_db.query(Client).filter_by(mac=mac_match.group(0)).first()
+
+                if client:
+                    if 'deassigned' in log:
+                        client.status = "expired"
+                    elif 'assigned' in log:
+                        client.status = "active"
+                    session_db.commit()
+                else:
+                    ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+                    ips = re.findall(ip_pattern, log)   
+
+                    if mac_match:
+                        mac = mac_match.group(0)
+                        ip = ips[1]
+
+                        parts = log.split(mac)
+                        hostname = parts[1].split()[0] if len(parts) > 1 else "Unknown"
+
+                        sqlClient, client_dict = db.add_client(mac=mac, ip=ip, hostname=hostname, status="active")
+                        del client_dict["id"]
+                        await manager.broadcast(json.dumps({"context": "dhcp1_add", "client_id": sqlClient.id, "data": client_dict}))
+
             msg = json.dumps({"content": log})
-            await manager.broadcast(msg)
         except Exception as e:
             print(f"Error in watch_logs: {e}")
             await asyncio.sleep(1)
@@ -20,7 +52,6 @@ async def watch_logs(log_queue: Queue, manager: classmethod):
 def log_collector(log_queue):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(('127.0.0.1', 5514))
-    print("UDP Collector started on port 5514")
 
     while True:
         data, addr = s.recvfrom(2048)

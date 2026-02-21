@@ -1,7 +1,9 @@
-import asyncio, socket, json, uvicorn
+import asyncio, socket, json, uvicorn, re
+import database as db
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from multiprocessing import Queue
+from database import session, Router
 
 from logmanager import watch_logs
 
@@ -16,12 +18,10 @@ class ConnectionManager:
         await ws.accept()
         async with self._lock:
             self._clients.add(ws)
-        print(f"DEBUG: Client connected. Total: {len(self._clients)}")
 
     async def disconnect(self, ws: WebSocket):
         async with self._lock:
             self._clients.discard(ws)
-        print("DEBUG: Client disconnected")
 
     async def broadcast(self, message: str):
         async with self._lock:
@@ -30,11 +30,12 @@ class ConnectionManager:
         if not clients:
             return
         
-        if 'dhcp1' in message.lower():
+        if 'dhcp1' in message:
             results = await asyncio.gather(
                 *[c.send_text(message) for c in clients],
                 return_exceptions=True
             )
+        
             dead = {c for c, r in zip(clients, results) if isinstance(r, Exception)}
             if dead:
                 async with self._lock:
@@ -44,8 +45,21 @@ manager = ConnectionManager()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    router = session().query(Router).first()
     await manager.connect(websocket)
     try:
+        await websocket.send_text(json.dumps(
+            {
+                "context": "initial",
+                "dhcp": db.get_clients(),
+                "router": {
+                    "mac_address": router.mac_address,
+                    "ip_address": router.ip_address,
+                    "dns_server": router.dns_server
+                }
+            }
+        ))
+
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
