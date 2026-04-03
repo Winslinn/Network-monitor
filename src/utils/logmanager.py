@@ -1,10 +1,9 @@
 import socket, asyncio, json, re
-import database as db
+import src.utils.database as db
 
-from database import Client, session
+from src.utils.database import Client, session
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from multiprocessing import Queue
-from analyze import analyze_log
 
 session_db = db.session()
 
@@ -16,7 +15,6 @@ async def watch_logs(log_queue: Queue, manager: classmethod):
             log = await loop.run_in_executor(None, log_queue.get)
             
             print(f"\r\033[0;32m{log}\033[0m\n> ", end="", flush=True)
-            await analyze_log(log, manager)
 
             if 'dhcp1' in log:
                 mac_pattern = r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}"

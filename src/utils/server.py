@@ -1,20 +1,20 @@
 import asyncio, json, uvicorn, uuid
-import database as db
+import src.utils.database as db
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-from database import session, Router
+from src.utils.database import session, Router
 
-from logmanager import watch_logs
-from sniffer import packet_listener
-from database import init as init_db
+from src.utils.logmanager import watch_logs
+from src.core.sniffer import packet_listener
+from src.utils.database import init as init_db
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,6 +77,15 @@ async def websocket_endpoint(
 ):
     router = session().query(Router).first()
     role = db.user(user_id) if user_id else "guest"
+    
+    if router is None:
+        router = Router(
+            mac_address="00:00:00:00:00:00",
+            ip_address="192.168.0.113",
+            dns_server="8.8.8.8"
+        )
+        session().add(router)
+        session().commit()
 
     await manager.connect(websocket)
     try:

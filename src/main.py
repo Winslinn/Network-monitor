@@ -1,5 +1,5 @@
 import asyncio, json
-import database as db
+import src.utils.database as db
 
 from requests.sessions import Session
 from requests.auth import HTTPBasicAuth
@@ -7,21 +7,9 @@ from multiprocessing import Process, Queue
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
-from logmanager import log_collector
-from server import run_websocket
-from sniffer import packet_collector
-
-router_ip = db.Router.ip_address
-
-class Router:
-    def __init__(self):
-        self.session = Session()
-        self.session.auth = HTTPBasicAuth(db.Router.admin_login, db.Router.admin_password)
-        self.session.verify = '../../cert1.crt'
-
-def get_directory(session: Session, direction: str):
-    response = session.get(f"http://{router_ip}/rest{direction}")
-    return json.dumps(response.json())
+from src.utils.logmanager import log_collector
+from src.utils.server import run_websocket
+from src.core.sniffer import packet_collector
 
 async def handle_input():
     session = PromptSession(erase_when_done=True)

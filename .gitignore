@@ -1,11 +1,12 @@
 # Ignoring node modules and source files
 **/node_modules/
-**/src/
+**/config/
 
 # Ignoring build artifacts
 **/build/
 **/package-lock.json
 **/package.json
+network-monitor_dev
 
 # Ignoring Python cache files and environment variables
 __pycache__/
