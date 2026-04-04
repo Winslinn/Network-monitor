@@ -1,8 +1,9 @@
 import socket, asyncio, json, re
-import src.utils.database as db
 
-from src.utils.database import Client, session
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import utils.database as db
+
+from utils.database import Client, session
+#from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from multiprocessing import Queue
 
 session_db = db.session()

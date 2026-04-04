@@ -1,14 +1,12 @@
 import asyncio, json, uvicorn, uuid
-import src.utils.database as db
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
-from src.utils.database import session, Router
+from typing import Optional, Dict
 
-from src.utils.logmanager import watch_logs
-from src.core.sniffer import packet_listener
-from src.utils.database import init as init_db
+import utils.database as db
+from utils.database import Session, Router, init_db
+from utils.logmanager import watch_logs
+from core.sniffer import packet_listener
 
 app = FastAPI()
 
@@ -34,126 +32,86 @@ class ConnectionManager:
         async with self._lock:
             self._clients.discard(ws)
 
-    async def broadcast(self, message: str):
+    async def broadcast(self, message: dict):
+        data = json.dumps(message)
         async with self._lock:
-            clients = list(self._clients)
-        
-        if not clients:
-            return
-        
-        await asyncio.gather(
-            *[c.send_text(message) for c in clients],
-            return_exceptions=True
-        )
+            if not self._clients: return
+            await asyncio.gather(
+                *[c.send_text(data) for c in self._clients],
+                return_exceptions=True
+            )
 
 manager = ConnectionManager()
-init_db()
+
+def get_user_role(user_id: Optional[str]) -> str:
+    if not user_id: return "guest"
+    user = db.user(user_id)
+    return user.get("role", "guest")
 
 @app.get("/api/auth")
 def auth(response: Response, user_id: Optional[str] = Cookie(default=None)):
-    is_new = False
-
     if not user_id:
         user_id = str(uuid.uuid4())
-        is_new = True
-
+        response.set_cookie(key="user_id", value=user_id, httponly=True, samesite="lax")
+    
     user = db.user(user_id)
-
-    if is_new:
-        response.set_cookie(
-            key="user_id",
-            value=user_id,
-            max_age=365*24*60*60,
-            httponly=True,
-            samesite="lax"
-        )
-
     return {"uuid": user["uuid"], "role": user["role"]}
 
 @app.websocket("/ws")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: Optional[str] = Cookie(default=None)
-):
-    router = session().query(Router).first()
-    role = db.user(user_id) if user_id else "guest"
+async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cookie(default=None)):
+    role = get_user_role(user_id)
     
-    if router is None:
-        router = Router(
-            mac_address="00:00:00:00:00:00",
-            ip_address="192.168.0.113",
-            dns_server="8.8.8.8"
-        )
-        session().add(router)
-        session().commit()
+    with Session() as session:
+        router = session.query(Router).first()
+        if not router:
+            router = Router(mac_address="00:00:00...", ip_address="192.168.0.1", dns_server="8.8.8.8")
+            session.add(router)
+            session.commit()
+            session.refresh(router)
+        
+        router_data = {
+            "mac_address": router.mac_address,
+            "ip_address": router.ip_address,
+            "dns_server": router.dns_server
+        }
 
     await manager.connect(websocket)
     try:
-        await websocket.send_text(json.dumps(
-            {
-                "context": "initial",
-                "role": role,
-                "dhcp": db.get_clients(),
-                "router": {
-                    "mac_address": router.mac_address,
-                    "ip_address": router.ip_address,
-                    "dns_server": router.dns_server
-                }
-            }
-        ))
+        await websocket.send_json({
+            "context": "initial",
+            "role": role,
+            "dhcp": db.get_clients(),
+            "router": router_data
+        })
 
         while True:
-            data = await websocket.receive_text()
-            try:
-                message = json.loads(data)
-                action = message.get("action")
+            data = await websocket.receive_json()
+            action = data.get("action")
 
-                if action == "add_rule" and role == "admin":
-                    rule_data = message.get("rule")
-
-                    rule_data, rule_dict = db.add_rule(
-                        name=rule_data["name"],
-                        type=rule_data["type"],
-                        severity=rule_data["severity"],
-                        description=rule_data["description"],
-                        pattern=rule_data["pattern"]
-                    )
-                    
-                    await websocket.send_text(json.dumps({
-                        "context": "rule_added",
-                        "rule": rule_dict
-                    }))
-
-                elif action == "delete_rule" and role == "admin":
-                    rule_id = message.get("rule_id")
-                    db.delete_rule(rule_id)
-
-                elif action == "get_rules" and role == "admin" or role == "analyst":
-                    rules = db.get_all_rules()
-                    await websocket.send_text(json.dumps({
-                        "context": "rules_list",
-                        "data": rules
-                    }))
-
-                elif action == "get_alerts" and role == "admin" or role == "analyst":
-                    alerts = db.get_all_alerts()
-                    await websocket.send_text(json.dumps({
-                        "context": "alerts_history",
-                        "data": alerts
-                    }))
-
+            if role == "admin":
+                if action == "add_rule":
+                    _, rule_dict = db.add_rule(**data.get("rule"))
+                    await websocket.send_json({"context": "rule_added", "rule": rule_dict})
+                elif action == "delete_rule":
+                    db.delete_rule(data.get("rule_id"))
                 elif action == "clear_alerts":
                     db.clear_all_alerts()
 
-            except json.JSONDecodeError:
-                print("Getted non-JSON message:", data)
+            if role in ["admin", "analyst"]:
+                if action == "get_rules":
+                    await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
+                elif action == "get_alerts":
+                    await websocket.send_json({"context": "alerts_history", "data": db.get_all_alerts()})
+
     except WebSocketDisconnect:
         pass
     finally:
         await manager.disconnect(websocket)
 
 def run_websocket(log_queue, packet_queue):
-    async def f():
+    init_db()
+    
+    async def serve():
         config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None)
         server = uvicorn.Server(config)
         
@@ -163,4 +121,4 @@ def run_websocket(log_queue, packet_queue):
             packet_listener(packet_queue)
         )
 
-    asyncio.run(f())
+    asyncio.run(serve())
