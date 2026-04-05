@@ -127,7 +127,7 @@ def run_websocket(log_queue, packet_queue):
         await asyncio.gather(
             server.serve(),
             watch_logs(log_queue, manager),
-            packet_listener(packet_queue)
+            packet_listener(packet_queue, manager)
         )
 
     try:
