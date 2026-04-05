@@ -35,7 +35,6 @@ async def main():
     try:
         await handle_input()
     finally:
-        print("Shutting down...")
         for process in processes:
             if process.is_alive():
                 process.terminate()

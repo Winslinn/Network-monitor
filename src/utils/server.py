@@ -1,7 +1,7 @@
 import asyncio, json, uvicorn, uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, Dict
+from typing import Optional
 
 import utils.database as db
 from utils.database import Session, Router, init_db
@@ -12,7 +12,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://192.168.0.187:3000", "http://localhost:3000", "http://127.0.0.1:3000"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,8 +45,8 @@ manager = ConnectionManager()
 
 def get_user_role(user_id: Optional[str]) -> str:
     if not user_id: return "guest"
-    user = db.user(user_id)
-    return user.get("role", "guest")
+    user = db.get_user(user_id)
+    return user.get("role", "guest") if user else "guest"
 
 @app.get("/api/auth")
 def auth(response: Response, user_id: Optional[str] = Cookie(default=None)):
@@ -54,8 +54,11 @@ def auth(response: Response, user_id: Optional[str] = Cookie(default=None)):
         user_id = str(uuid.uuid4())
         response.set_cookie(key="user_id", value=user_id, httponly=True, samesite="lax")
     
-    user = db.user(user_id)
-    return {"uuid": user["uuid"], "role": user["role"]}
+    user_data = db.get_user(user_id)
+    if not user_data:
+        user_data = db.create_user(user_id)
+        
+    return {"uuid": user_data["uuid"], "role": user_data["role"]}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cookie(default=None)):
@@ -64,7 +67,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
     with Session() as session:
         router = session.query(Router).first()
         if not router:
-            router = Router(mac_address="00:00:00...", ip_address="192.168.0.1", dns_server="8.8.8.8")
+            router = Router(mac_address="00:00:00:00:00:00", ip_address="192.168.0.1", dns_server="8.8.8.8")
             session.add(router)
             session.commit()
             session.refresh(router)
@@ -86,22 +89,28 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
 
         while True:
             data = await websocket.receive_json()
-            action = data.get("action")
-
-            if role == "admin":
-                if action == "add_rule":
-                    _, rule_dict = db.add_rule(**data.get("rule"))
-                    await websocket.send_json({"context": "rule_added", "rule": rule_dict})
-                elif action == "delete_rule":
-                    db.delete_rule(data.get("rule_id"))
-                elif action == "clear_alerts":
-                    db.clear_all_alerts()
-
             if role in ["admin", "analyst"]:
+                action = data.get("action")
+                print(action)
                 if action == "get_rules":
                     await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
+            
                 elif action == "get_alerts":
                     await websocket.send_json({"context": "alerts_history", "data": db.get_all_alerts()})
+
+                elif action == "add_rule":
+                    rule_data = data.get("rule")
+                    if rule_data:
+                        db.add_rule(rule_data)
+                        
+                        await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
+                    
+                elif action == "delete_rule":
+                    rule_id = data.get("rule_id")
+                    if rule_id:
+                        db.delete_rule(rule_id)
+                        
+                        await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
 
     except WebSocketDisconnect:
         pass
@@ -121,4 +130,7 @@ def run_websocket(log_queue, packet_queue):
             packet_listener(packet_queue)
         )
 
-    asyncio.run(serve())
+    try:
+        asyncio.run(serve())
+    except KeyboardInterrupt:
+        pass

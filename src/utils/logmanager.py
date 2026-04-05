@@ -2,11 +2,11 @@ import socket, asyncio, json, re
 
 import utils.database as db
 
-from utils.database import Client, session
+from utils.database import Client, Session
 #from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from multiprocessing import Queue
 
-session_db = db.session()
+session_db = db.Session()
 
 async def watch_logs(log_queue: Queue, manager: classmethod):
     loop = asyncio.get_event_loop()
