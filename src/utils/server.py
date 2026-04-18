@@ -12,7 +12,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://192.168.0.187:3001", "http://localhost:3001", "http://127.0.0.1:3001"], 
+    allow_origins=["http://potyshyi-server:3001", "http://potyshyi-server.local:3001", "http://localhost:3001", "http://127.0.0.1:3001"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

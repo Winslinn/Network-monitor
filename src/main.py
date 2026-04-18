@@ -21,7 +21,7 @@ async def handle_input():
 
 async def main():
     log_queue = Queue()
-    packet_queue = Queue()
+    packet_queue = Queue()  
 
     processes = [
         Process(target=log_collector, args=(log_queue,), daemon=True),
