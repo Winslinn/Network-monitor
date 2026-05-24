@@ -38,6 +38,7 @@ export default function NetworkMonitor() {
     hostname: "MikroTik CHR", ip: "-", mac: "-", dns: "-",
     wanStatus: "—", cpuUsage: 0, ramUsage: 0,
     downloadSpeed: "-", uploadSpeed: "-",
+    uptime: "00:00:00",
   });
 
   const [clients, setClients] = useState([]);
@@ -51,6 +52,7 @@ export default function NetworkMonitor() {
 
   const [logs, setLogs] = useState([]);
   const [packets, setPackets] = useState({});
+  const packetsRef = useRef({});
   const [sessionOrder, setSessionOrder] = useState([]);
   const [toasts, setToasts] = useState([]);
   
@@ -76,7 +78,7 @@ export default function NetworkMonitor() {
       setClients(msg.dhcp || []);
       setRouterInfo(prev => ({
         ...prev,
-        hostname: r.hostname || "MikroTik",
+        hostname: r.device_name,
         ip: r.ip_address || "-",
         mac: r.mac_address || "-",
         dns: Array.isArray(r.dns_server) ? r.dns_server.join(", ") : (r.dns_server || "-"),
@@ -85,34 +87,51 @@ export default function NetworkMonitor() {
         ramUsage: r.ramUsage ?? prev.ramUsage,
         downloadSpeed: r.downloadSpeed || prev.downloadSpeed,
         uploadSpeed: r.uploadSpeed || prev.uploadSpeed,
+        uptime: r.uptime,
       }));
       if (msg.logs) setLogs(msg.logs.map(log => ({ ...log, timestamp: log.timestamp || new Date().toISOString() })));
     }
     else if (ctx === "stats") setRouterInfo(prev => ({ ...prev, ...msg }));
-    else if (ctx === "log") setLogs(prev => [...prev.slice(-199), { ...msg.data, timestamp: new Date().toISOString(), id: Date.now() + Math.random() }]);
-    else if (ctx === "dhcp") setClients(msg.data || []);
+    else if (ctx === "log") {
+      console.log(msg.data);
+      setLogs(prev => [...prev.slice(-199), { ...msg.data, timestamp: new Date().toISOString(), id: Date.now() + Math.random() }]);
+    }
+    else if (ctx === "dhcp") {
+      setClients(prev => {
+        const exists = prev.find(c => c.id === msg.data.id);
+        if (exists) {
+          return prev.map(c => c.id === msg.data.id ? msg.data : c);
+        } else {
+          return [...prev, msg.data];
+        }
+      });
+    }
     else if (ctx === "packet") {
       const incoming = msg.data || [];
-      setPackets(prev => {
-        const newMap = { ...prev };
-        const newKeys = [];
-        incoming.forEach(pkt => {
-          const sessionKey = `${pkt.src_address}_${pkt.dst_address}_${pkt.dst_port}`;
-          if (newMap[sessionKey]) {
-            newMap[sessionKey] = {
-              ...newMap[sessionKey],
-              count: (newMap[sessionKey].count || 0) + 1,
-              last_seen: new Date().toISOString(),
-              payload: (pkt.payload && pkt.payload.trim() !== "") ? pkt.payload : newMap[sessionKey].payload
-            };
-          } else {
-            newMap[sessionKey] = { ...pkt, count: 1, last_seen: new Date().toISOString(), uniqueId: Math.random().toString(36).substr(2, 9) };
-            newKeys.push(sessionKey);
-          }
-        });
-        if (newKeys.length > 0) setSessionOrder(prevOrder => [...prevOrder, ...newKeys]);
-        return newMap;
+      const newKeys = [];
+      const newMap = { ...packetsRef.current };
+
+      incoming.forEach(pkt => {
+        const sessionKey = `${pkt.src_address}_${pkt.dst_address}_${pkt.dst_port}`;
+        if (newMap[sessionKey]) {
+          newMap[sessionKey] = {
+            ...newMap[sessionKey],
+            count: (newMap[sessionKey].count || 0) + 1,
+            last_seen: new Date().toISOString(),
+            payload: (pkt.payload && pkt.payload.trim() !== "") ? pkt.payload : newMap[sessionKey].payload
+          };
+        } else {
+          newMap[sessionKey] = { ...pkt, count: 1, last_seen: new Date().toISOString(), uniqueId: Math.random().toString(36).substr(2, 9) };
+          newKeys.push(sessionKey);
+        }
       });
+
+      packetsRef.current = newMap; // оновлюємо ref одразу
+      setPackets(newMap);          // і стейт для рендеру
+
+      if (newKeys.length > 0) {
+        setSessionOrder(prev => [...prev, ...newKeys]);
+      }
     }
     else if (ctx === "alert") {
       setAlerts(prev => [{ ...msg.data, _received: Date.now() }, ...prev].slice(0, 200));
@@ -132,7 +151,7 @@ export default function NetworkMonitor() {
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
     ws.onopen = () => {
-      setWsStatus("open");
+      setWsStatus("ok");
       pingTimer.current = setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({ action: "ping" })), PING_INTERVAL);
       ws.send(JSON.stringify({ action: "get_rules" }));
     };
@@ -176,14 +195,13 @@ export default function NetworkMonitor() {
           <div className="topbar-logo">📡</div>
           <div>
             <span className="topbar-brand">NetWatch</span>
-            <span className="topbar-version">v1.2</span>
           </div>
           <div className="topbar-spacer" />
           <div className="topbar-status">
-            <div className={`pulse-dot ${wsStatus === "open" ? "dot-green" : wsStatus === "reconnecting" ? "dot-yellow" : "dot-red"}`} />
+            <div className={`pulse-dot ${wsStatus === "ok" ? "dot-green" : wsStatus === "reconnecting" ? "dot-yellow" : "dot-red"}`} />
             {wsStatus.toUpperCase()}
           </div>
-          <div className="topbar-time">{now.toLocaleTimeString("uk-UA")}</div>
+          <div className="topbar-time">{routerInfo.uptime}</div>
         </header>
 
         <div className="app-body">
@@ -191,14 +209,14 @@ export default function NetworkMonitor() {
           <nav className="sidebar">
             <span className="sidebar-section-label">Навігація</span>
             <button className={`nav-btn ${tab === "dashboard" ? "active" : ""}`} onClick={() => setTab("dashboard")}>
-              <span className="nav-icon">▣</span><span>Дашборд</span>
+              <span className="nav-icon"></span><span>Дашборд</span>
             </button>
             <button className={`nav-btn ${tab === "alerts" ? "active" : ""}`} onClick={() => setTab("alerts")}>
-              <span className="nav-icon">⚡</span><span>Події</span>
+              <span className="nav-icon"></span><span>Події</span>
               {unreadAlerts > 0 && <span className="nav-badge">{unreadAlerts}</span>}
             </button>
             <button className={`nav-btn ${tab === "rules" ? "active" : ""}`} onClick={() => setTab("rules")}>
-              <span className="nav-icon">⚙</span><span>Правила</span>
+              <span className="nav-icon"></span><span>Правила</span>
             </button>
           </nav>
 
@@ -216,7 +234,6 @@ export default function NetworkMonitor() {
               </div>
             )}
 
-            {/* ── DASHBOARD ── */}
             {tab === "dashboard" && (
               <>
                 <Dashboard routerInfo={routerInfo} />

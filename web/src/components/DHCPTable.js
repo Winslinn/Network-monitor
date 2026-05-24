@@ -4,7 +4,7 @@ export default function DHCPTable({ clients, search, setSearch }) {
     <div className="card">
       <div className="dhcp-header-row">
         <div>
-          <div className="card-title">DHCP клієнти</div>
+          <div className="card-title">Пристрої</div>
           <div className="dhcp-count"><span>{activeCount}</span> активних</div>
         </div>
         <input className="search-input" placeholder="Пошук..." onChange={e => setSearch(e.target.value)} />

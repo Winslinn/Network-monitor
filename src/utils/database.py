@@ -15,7 +15,7 @@ class Router(Base):
     __tablename__ = "router_info"
     id: Mapped[int] = mapped_column(primary_key=True)
     mac_address: Mapped[str] = mapped_column(unique=True)
-    ip_address: Mapped[str] = mapped_column(default="192.168.0.133")
+    ip_address: Mapped[str] = mapped_column()
     dns_server: Mapped[Optional[str]] = mapped_column()
     admin_login: Mapped[str] = mapped_column(default="admin")
     admin_password: Mapped[str] = mapped_column(default="admin")

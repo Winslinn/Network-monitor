@@ -1,6 +1,9 @@
 import socket, asyncio
 
+from lupa import LuaRuntime
 from multiprocessing import Queue
+
+lua = LuaRuntime()
 
 async def packet_listener(packet_queue: Queue, manager: classmethod):
     loop = asyncio.get_event_loop()
@@ -77,5 +80,5 @@ def packet_collector(packet_queue: Queue):
             "flags": flags,
             "payload": payload
         }
-        
+
         packet_queue.put(processed_packet)

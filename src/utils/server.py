@@ -2,17 +2,27 @@ import asyncio, json, uvicorn, uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+from contextlib import asynccontextmanager
 
 import utils.database as db
 from utils.database import Session, Router, init_db
 from utils.logmanager import watch_logs
 from core.sniffer import packet_listener
+from core.router import init as init_router, router_manager
+from utils.snmp import close_snmp
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(init_router(manager))
+    yield
+    task.cancel()
+    close_snmp()
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://potyshyi-server:3001", "http://potyshyi-server.local:3001", "http://localhost:3001", "http://127.0.0.1:3001"], 
+    allow_origins=["http://potyshyi-server:3001", "http://localhost:3001", "http://127.0.0.1:3001"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,16 +73,16 @@ def auth(response: Response, user_id: Optional[str] = Cookie(default=None)):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cookie(default=None)):
     role = get_user_role(user_id)
-    
+
     with Session() as session:
         router = session.query(Router).first()
         if not router:
-            router = Router(mac_address="00:00:00:00:00:00", ip_address="192.168.0.1", dns_server="8.8.8.8")
+            router = Router(mac_address=router_manager.data.get('mac_address'), ip_address=router_manager.data.get('lan_address'))
             session.add(router)
             session.commit()
-            session.refresh(router)
         
         router_data = {
+            "device_name": router_manager.data.get("device_name"),
             "mac_address": router.mac_address,
             "ip_address": router.ip_address,
             "dns_server": router.dns_server
