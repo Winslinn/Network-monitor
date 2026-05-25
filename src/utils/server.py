@@ -22,7 +22,11 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://potyshyi-server:3001", "http://localhost:3001", "http://127.0.0.1:3001"], 
+    allow_origins=[
+        "http://potyshyi-server:3001", 
+        "http://localhost:3001", 
+        "http://127.0.0.1:3001"
+    ], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,7 +81,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
     with Session() as session:
         router = session.query(Router).first()
         if not router:
-            router = Router(mac_address=router_manager.data.get('mac_address'), ip_address=router_manager.data.get('lan_address'))
+            router = Router(
+                mac_address=router_manager.data.get('mac_address'), 
+                ip_address=router_manager.data.get('lan_address')
+            )
             session.add(router)
             session.commit()
         

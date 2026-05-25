@@ -106,31 +106,35 @@ export default function NetworkMonitor() {
         }
       });
     }
-    else if (ctx === "packet") {
-      const incoming = msg.data || [];
-      const newKeys = [];
-      const newMap = { ...packetsRef.current };
+    else if (ctx === "flows") {
+      const delta = msg.data || {};
+      
+      if (Object.keys(delta).length === 0) return;
 
-      incoming.forEach(pkt => {
-        const sessionKey = `${pkt.src_address}_${pkt.dst_address}_${pkt.dst_port}`;
-        if (newMap[sessionKey]) {
-          newMap[sessionKey] = {
-            ...newMap[sessionKey],
-            count: (newMap[sessionKey].count || 0) + 1,
-            last_seen: new Date().toISOString(),
-            payload: (pkt.payload && pkt.payload.trim() !== "") ? pkt.payload : newMap[sessionKey].payload
-          };
-        } else {
-          newMap[sessionKey] = { ...pkt, count: 1, last_seen: new Date().toISOString(), uniqueId: Math.random().toString(36).substr(2, 9) };
-          newKeys.push(sessionKey);
-        }
+      packetsRef.current = { ...packetsRef.current };
+      
+      const newKeys = [];
+
+      Object.entries(delta).forEach(([sessionKey, flow]) => {
+        const isNew = !packetsRef.current[sessionKey];
+
+        packetsRef.current[sessionKey] = {
+          src:      flow.src,
+          dst:      flow.dst,
+          protocol: flow.protocol,
+          dports:   flow.dports,   // { "443": 350, "80": 12 }
+          flags:    flow.flags,    // { "16": 245, "24": 12 }
+          count:    flow.packet_count,
+          uniqueId: packetsRef.current[sessionKey]?.uniqueId || Math.random().toString(36).substr(2, 9),
+        };
+
+        if (isNew) newKeys.push(sessionKey);
       });
 
-      packetsRef.current = newMap; // оновлюємо ref одразу
-      setPackets(newMap);          // і стейт для рендеру
+      setPackets({ ...packetsRef.current });
 
       if (newKeys.length > 0) {
-        setSessionOrder(prev => [...prev, ...newKeys]);
+        setSessionOrder(prev => [...newKeys, ...prev]);
       }
     }
     else if (ctx === "alert") {
