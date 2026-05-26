@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager
 
 import utils.database as db
 from utils.database import Session, Router, init_db
-from utils.logmanager import watch_logs
-from core.sniffer import packet_listener
+from utils.logmanager import watch_logs, watch_flows, watch_results
 from core.router import init as init_router, router_manager
 from utils.snmp import close_snmp
 
@@ -108,7 +107,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
             data = await websocket.receive_json()
             if role in ["admin", "analyst"]:
                 action = data.get("action")
-                print(action)
                 if action == "get_rules":
                     await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
             
@@ -134,9 +132,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
     finally:
         await manager.disconnect(websocket)
 
-def run_websocket(log_queue, packet_queue):
+def run_websocket(log_queue, flow_queue, result_queue):
     init_db()
-    
     async def serve():
         config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None)
         server = uvicorn.Server(config)
@@ -144,7 +141,8 @@ def run_websocket(log_queue, packet_queue):
         await asyncio.gather(
             server.serve(),
             watch_logs(log_queue, manager),
-            packet_listener(packet_queue, manager)
+            watch_flows(flow_queue, manager),
+            watch_results(result_queue, manager)
         )
 
     try:

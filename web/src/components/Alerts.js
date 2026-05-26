@@ -25,7 +25,7 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                     <span className={`sev-tag sev-${a.severity}`}>{a.severity}</span>
                   </div>
                   <div className="alert-desc">{a.description}</div>
-                  <div className="alert-meta"><span>{fmtDate(a.timestamp)}</span></div>
+                  <div className="alert-meta"><span>{fmtDate(a.timestamp * 1000)}</span></div>
                 </div>
               </div>
             ))

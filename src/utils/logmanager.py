@@ -2,13 +2,36 @@ import socket, asyncio, json, re
 
 import utils.database as db
 
-from utils.database import Client, Session
-#from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from utils.database import Client
 from multiprocessing import Queue
 
 session_db = db.Session()
 
-async def watch_logs(log_queue: Queue, manager: classmethod):
+async def watch_flows(flow_queue: Queue, manager):
+    loop = asyncio.get_event_loop()
+    
+    while True:
+        try:
+            flow = await loop.run_in_executor(None, flow_queue.get)
+            await manager.broadcast({"context": "flows", "data": flow})
+        except Exception as e:
+            print(f"Error in watch_flows: {e}")
+            await asyncio.sleep(1)
+
+async def watch_results(result_queue: Queue, manager):
+    loop = asyncio.get_event_loop()
+
+    while True:
+        try:
+            result = await loop.run_in_executor(None, result_queue.get)
+            await manager.broadcast({"context": "alert", "data": result})
+
+            print(f"New detection result: {result['type']}, packet count: {result['total']}, unique ports/sec: {result['ports_per_sec']}")
+        except Exception as e:
+            print(f"Error in watch_results: {e}")
+            await asyncio.sleep(1)
+
+async def watch_logs(log_queue: Queue, manager):
     loop = asyncio.get_event_loop()
 
     while True:

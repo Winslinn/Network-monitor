@@ -108,7 +108,6 @@ export default function NetworkMonitor() {
     }
     else if (ctx === "flows") {
       const delta = msg.data || {};
-      
       if (Object.keys(delta).length === 0) return;
 
       packetsRef.current = { ...packetsRef.current };
@@ -119,13 +118,13 @@ export default function NetworkMonitor() {
         const isNew = !packetsRef.current[sessionKey];
 
         packetsRef.current[sessionKey] = {
-          src:      flow.src,
-          dst:      flow.dst,
-          protocol: flow.protocol,
-          dports:   flow.dports,   // { "443": 350, "80": 12 }
-          flags:    flow.flags,    // { "16": 245, "24": 12 }
-          count:    flow.packet_count,
-          uniqueId: packetsRef.current[sessionKey]?.uniqueId || Math.random().toString(36).substr(2, 9),
+          src:          flow.src,
+          dst:          flow.dst,
+          protocol:     flow.protocol,
+          unique_ports: flow.unique_ports,
+          flags:        flow.flags,
+          count:        flow.packet_count,
+          uniqueId:     packetsRef.current[sessionKey]?.uniqueId || Math.random().toString(36).substr(2, 9),
         };
 
         if (isNew) newKeys.push(sessionKey);

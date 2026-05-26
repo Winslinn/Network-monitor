@@ -62,7 +62,6 @@ export default function Terminal({
               const dports = flow.dports || {};
               const flags  = flow.flags  || {};
 
-              // Сортуємо порти по кількості пакетів (найактивніший першим)
               const sortedPorts = Object.entries(dports)
                 .sort(([, a], [, b]) => b - a);
 
@@ -79,26 +78,13 @@ export default function Terminal({
                     </div>
                     <div className="connection-meta-right">
                       Пакетів: <span className="highlight-text">{flow.count || 0}</span>
+                      {' · '}
+                      Портів: <span className={`highlight-text ${flow.unique_ports > 100 ? 'flag-anomaly' : ''}`}>
+                        {flow.unique_ports || 0}
+                      </span>
                     </div>
                   </div>
 
-                  {/* ПОРТИ з лічильниками */}
-                  {sortedPorts.length > 0 && (
-                    <div className="connection-flags-container">
-                      <span className="flags-label">Ports:</span>
-                      {sortedPorts.map(([port, count]) => {
-                        // Підсвічуємо підозрілі порти
-                        const isSuspicious = ![80, 443, 53, 22, 67, 68, 123, 161, 5353].includes(parseInt(port));
-                        return (
-                          <span key={port} className={`flag-counter-badge ${isSuspicious ? 'flag-anomaly' : ''}`}>
-                            :{port} <span className="flag-count">{count}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* TCP ПРАПОРЦІ */}
                   {flow.protocol === 6 && Object.keys(flags).length > 0 && (
                     <div className="connection-flags-container">
                       <span className="flags-label">Flags:</span>

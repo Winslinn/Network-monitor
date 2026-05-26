@@ -21,12 +21,13 @@ async def handle_input():
 
 async def main():
     log_queue = Queue()
-    packet_queue = Queue()
+    result_queue = Queue()
+    flow_queue = Queue()
 
     processes = [
         Process(target=log_collector, args=(log_queue,), daemon=True),
-        Process(target=packet_collector, args=(packet_queue,), daemon=True),
-        Process(target=run_websocket, args=(log_queue, packet_queue), daemon=True)
+        Process(target=run_websocket, args=(log_queue, flow_queue, result_queue), daemon=True),
+        Process(target=packet_collector, args=(result_queue, flow_queue), daemon=True)
     ]
 
     for proc in processes:

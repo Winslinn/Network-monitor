@@ -1,35 +1,9 @@
-import socket, asyncio
+import socket, time
 
-from lupa import LuaRuntime
 from collections import Counter
-from pprint import pprint
 from multiprocessing import Queue
-
-lua = LuaRuntime()
-
-async def packet_listener(packet_queue: Queue, manager: classmethod):
-    loop = asyncio.get_event_loop()
-    
-    while True:
-        await asyncio.sleep(0.25)
+from core.loader import DETECTORS
         
-        flows, dirty = await loop.run_in_executor(None, packet_queue.get)
-        try:
-            while not packet_queue.empty():
-                flows, new_dirty = packet_queue.get_nowait()
-                dirty |= new_dirty
-        except:
-            pass
-        
-        delta = {}
-        for k in dirty:
-            v = flows[k]
-            str_key = f"{k[0]}-{k[1]}/{k[2]}"
-            delta[str_key] = {**v, 'flags': dict(v['flags']), 'dports': dict(v['dports'])}
-        
-        if delta:
-            await manager.broadcast({'context': 'flows', 'data': delta})
-
 def get_service_port(sport, dport):
     if dport >= 49152 and sport < 49152:
         return sport
@@ -41,14 +15,12 @@ def get_flow_key(packet):
     src = packet['src_address']
     dst = packet['dst_address']
     proto = packet['protocol']
-    sport = packet['src_port']
-    dport = packet['dst_port']
     
     if src > dst:
         return (dst, src, proto)
     return (src, dst, proto)
 
-def packet_collector(packet_queue: Queue):
+def packet_collector(result_queue: Queue, flow_queue: Queue):
     listen_ip = '0.0.0.0'
     listen_port = 37008
     
@@ -113,16 +85,40 @@ def packet_collector(packet_queue: Queue):
                 'src': src_address,
                 'dst': dst_address,
                 'protocol': protocol,
+                'start_time': time.time(),
+                'last_time': 0,
                 'flags': Counter(),
                 'dports': Counter(),
                 'packet_count': 0,
             }
-            
+        
         service_port = get_service_port(ports[0], ports[1])
+        
+        flows[packet_key]['last_time'] = time.time()
         flows[packet_key]['dports'][service_port] += 1
         flows[packet_key]['packet_count'] += 1
         if flags is not None:
             flows[packet_key]['flags'][flags] += 1
 
-        packet_queue.put((flows, dirty.copy()))
+        delta = {}
+        for k in dirty:
+            v = flows[k]
+            str_key = f"{k[0]}-{k[1]}/{k[2]}"
+            delta[str_key] = {
+                'src':          v['src'],
+                'dst':          v['dst'],
+                'protocol':     v['protocol'],
+                'packet_count': v['packet_count'],
+                'unique_ports': len(v['dports']),
+                'flags':        dict(v['flags']),
+                'start_time':   v['start_time'],
+                'last_time':    v['last_time']
+            }
+
+            for detector in DETECTORS:
+                result = detector.analyze(v)
+                if result:
+                    result_queue.put(result)
+
+        flow_queue.put(delta)
         dirty.clear()
