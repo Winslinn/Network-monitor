@@ -16,3 +16,7 @@ __pycache__/
 .vscode
 .venv
 *.code-workspace
+
+# Ignoring React build artifacts
+**/node_modules
+**/public

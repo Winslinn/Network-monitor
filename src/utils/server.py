@@ -2,17 +2,30 @@ import asyncio, json, uvicorn, uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+from contextlib import asynccontextmanager
 
 import utils.database as db
 from utils.database import Session, Router, init_db
-from utils.logmanager import watch_logs
-from core.sniffer import packet_listener
+from utils.logmanager import watch_logs, watch_flows, watch_results
+from core.router import init as init_router, router_manager
+from utils.snmp import close_snmp
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(init_router(manager))
+    yield
+    task.cancel()
+    close_snmp()
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://192.168.0.187:3001", "http://localhost:3001", "http://127.0.0.1:3001"], 
+    allow_origins=[
+        "http://potyshyi-server:3001", 
+        "http://localhost:3001", 
+        "http://127.0.0.1:3001"
+    ], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,16 +76,19 @@ def auth(response: Response, user_id: Optional[str] = Cookie(default=None)):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cookie(default=None)):
     role = get_user_role(user_id)
-    
+
     with Session() as session:
         router = session.query(Router).first()
         if not router:
-            router = Router(mac_address="00:00:00:00:00:00", ip_address="192.168.0.1", dns_server="8.8.8.8")
+            router = Router(
+                mac_address=router_manager.data.get('mac_address'), 
+                ip_address=router_manager.data.get('lan_address')
+            )
             session.add(router)
             session.commit()
-            session.refresh(router)
         
         router_data = {
+            "device_name": router_manager.data.get("device_name"),
             "mac_address": router.mac_address,
             "ip_address": router.ip_address,
             "dns_server": router.dns_server
@@ -91,7 +107,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
             data = await websocket.receive_json()
             if role in ["admin", "analyst"]:
                 action = data.get("action")
-                print(action)
                 if action == "get_rules":
                     await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
             
@@ -117,9 +132,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cook
     finally:
         await manager.disconnect(websocket)
 
-def run_websocket(log_queue, packet_queue):
+def run_websocket(log_queue, flow_queue, result_queue):
     init_db()
-    
     async def serve():
         config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None)
         server = uvicorn.Server(config)
@@ -127,7 +141,8 @@ def run_websocket(log_queue, packet_queue):
         await asyncio.gather(
             server.serve(),
             watch_logs(log_queue, manager),
-            packet_listener(packet_queue, manager)
+            watch_flows(flow_queue, manager),
+            watch_results(result_queue, manager)
         )
 
     try:
