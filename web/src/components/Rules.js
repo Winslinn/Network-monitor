@@ -1,7 +1,7 @@
 import { Card, Button, Form, ListGroup, Badge, Stack, InputGroup } from "react-bootstrap";
 import { Plus, X, ShieldAlert, Save } from "lucide-react";
 
-export default function Rules({ rules, showAddRule, setShowAddRule, newRule, setNewRule, handleAddRule, wsSend }) {
+export default function Rules({ rules, showAddRule, setShowAddRule, newRule, setNewRule, handleAddRule, wsSend, canEdit }) {
   const getSeverityVariant = (sev) => {
     switch(sev?.toLowerCase()) {
       case 'critical': return 'danger';
@@ -17,7 +17,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
       <Card.Header className="bg-transparent border-secondary py-3">
         <div className="d-flex justify-content-between align-items-center">
           <Card.Title className="mb-0 fw-bold">Правила виявлення</Card.Title>
-          {!showAddRule && (
+          {canEdit && !showAddRule && (
             <Button variant="primary" size="sm" onClick={() => setShowAddRule(true)} className="d-flex align-items-center gap-2">
               <Plus size={16} /> Нове правило
             </Button>
@@ -25,7 +25,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
         </div>
       </Card.Header>
       <Card.Body className="p-4">
-        {showAddRule && (
+        {canEdit && showAddRule && (
           <Card className="bg-black bg-opacity-25 border-secondary mb-4">
             <Card.Body className="p-3">
               <h6 className="text-secondary small text-uppercase fw-bold mb-3 font-monospace">Створення нового правила</h6>
@@ -70,13 +70,15 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                 <Badge bg={getSeverityVariant(rule.severity)} className="text-uppercase font-monospace px-3 py-2">
                   {rule.severity}
                 </Badge>
-                <Button 
-                  variant="link" 
-                  className="text-danger p-0 ms-2 opacity-75 hover-opacity-100" 
-                  onClick={() => wsSend({ action: "delete_rule", rule_id: rule.id })}
-                >
-                  <X size={20} />
-                </Button>
+                {canEdit && (
+                  <Button 
+                    variant="link" 
+                    className="text-danger p-0 ms-2 opacity-75 hover-opacity-100" 
+                    onClick={() => wsSend({ action: "delete_rule", rule_id: rule.id })}
+                  >
+                    <X size={20} />
+                  </Button>
+                )}
               </ListGroup.Item>
             ))
           )}

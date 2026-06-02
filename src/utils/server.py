@@ -105,12 +105,16 @@ async def login(request: LoginRequest, response: Response):
 async def get_me(access_token: Optional[str] = Cookie(default=None)):
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     user = get_current_user_from_token(access_token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
-    
-    return {"username": user["username"], "roles": user["roles"]}
+
+    return {
+        "username": user["username"], 
+        "roles": user["roles"], 
+        "permissions": user.get("permissions", [])
+    }
 
 @app.post("/api/logout")
 async def logout(response: Response):
@@ -122,24 +126,25 @@ async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] =
     if not access_token:
         await websocket.close(code=1008)
         return
-    
+
     user = get_current_user_from_token(access_token)
     if not user:
         await websocket.close(code=1008)
         return
 
     role = user["roles"][0] if user["roles"] else "guest"
+    permissions = user.get("permissions", [])
 
     with Session() as session:
         router = session.query(Router).first()
         if not router:
             router = Router(
-                mac_address=router_manager.data.get('mac_address'), 
+                mac_address=router_manager.data.get('mac_address'),
                 ip_address=router_manager.data.get('lan_address')
             )
             session.add(router)
             session.commit()
-        
+
         router_data = {
             "device_name": router_manager.data.get("device_name"),
             "mac_address": router.mac_address,
@@ -152,39 +157,41 @@ async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] =
         await websocket.send_json({
             "context": "initial",
             "role": role,
+            "permissions": permissions,
             "dhcp": db.get_clients(),
             "router": router_data
         })
 
         while True:
             data = await websocket.receive_json()
-            if role in ["admin", "analyst"]:
-                action = data.get("action")
-                if action == "get_rules":
+            action = data.get("action")
+
+            if action == "get_rules":
+                if "rules:view" in permissions:
                     await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
-            
-                elif action == "get_alerts":
+
+            elif action == "get_alerts":
+                if "alerts:view" in permissions:
                     await websocket.send_json({"context": "alerts_history", "data": db.get_all_alerts()})
 
-                elif action == "add_rule":
+            elif action == "add_rule":
+                if "rules:edit" in permissions:
                     rule_data = data.get("rule")
                     if rule_data:
                         db.add_rule(rule_data)
-                        
                         await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
-                    
-                elif action == "delete_rule":
+
+            elif action == "delete_rule":
+                if "rules:edit" in permissions:
                     rule_id = data.get("rule_id")
                     if rule_id:
                         db.delete_rule(rule_id)
-                        
                         await websocket.send_json({"context": "rules_list", "data": db.get_all_rules()})
 
     except WebSocketDisconnect:
         pass
     finally:
         await manager.disconnect(websocket)
-
 def run_websocket(log_queue, flow_queue, result_queue):
     init_db()
     async def serve():

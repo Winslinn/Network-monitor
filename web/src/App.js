@@ -41,6 +41,7 @@ function MainLayout({ isAuth, setIsAuth }) {
   const [tab, setTab] = useState("dashboard");
   const [wsStatus, setWsStatus] = useState("connecting");
   const [userRole, setUserRole] = useState(null);
+  const [permissions, setPermissions] = useState([]);
   const wsRef = useRef(null);
   const pingTimer = useRef(null);
 
@@ -88,6 +89,7 @@ function MainLayout({ isAuth, setIsAuth }) {
     if (ctx === "initial") {
       const r = msg.router || {};
       setUserRole(msg.role);
+      setPermissions(msg.permissions || []);
       setClients(msg.dhcp || []);
       setRouterInfo(prev => ({
         ...prev,
@@ -147,6 +149,7 @@ function MainLayout({ isAuth, setIsAuth }) {
       setWsStatus("ok");
       pingTimer.current = setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({ action: "ping" })), PING_INTERVAL);
       ws.send(JSON.stringify({ action: "get_rules" }));
+      ws.send(JSON.stringify({ action: "get_alerts" }));
     };
     ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
     ws.onclose = (e) => {
@@ -180,9 +183,12 @@ function MainLayout({ isAuth, setIsAuth }) {
   const rulesProps = {
     rules, showAddRule, setShowAddRule, newRule, setNewRule,
     handleAddRule, wsSend: (p) => wsSend(p),
+    canEdit: permissions.includes("rules:edit")
   };
 
   const statusVariant = wsStatus === "ok" ? "success" : wsStatus === "reconnecting" ? "warning" : "danger";
+
+  const hasPerm = (p) => permissions.includes(p);
 
   return (
     <div className="bg-dark text-light min-vh-100">
@@ -202,29 +208,35 @@ function MainLayout({ isAuth, setIsAuth }) {
         <Row className="g-0">
           <Col md={3} lg={2} className="bg-dark border-end border-secondary min-vh-100 p-3 d-none d-md-block sticky-top" style={{ top: '56px', height: 'calc(100vh - 56px)' }}>
             <Nav variant="pills" className="flex-column gap-1">
-              <Nav.Link active={tab === "dashboard"} onClick={() => setTab("dashboard")} className="d-flex align-items-center gap-3">
-                <LayoutIcon size={18} /> <span>Дашборд</span>
-              </Nav.Link>
-              <Nav.Link active={tab === "alerts"} onClick={() => setTab("alerts")} className="d-flex align-items-center gap-3 position-relative">
-                <BellIcon size={18} /> <span>Події</span>
-                {unreadAlerts > 0 && <Badge bg="danger" pill className="ms-auto">{unreadAlerts}</Badge>}
-              </Nav.Link>
-              <Nav.Link active={tab === "rules"} onClick={() => setTab("rules")} className="d-flex align-items-center gap-3">
-                <ShieldIcon size={18} /> <span>Правила</span>
-              </Nav.Link>
+              {hasPerm("dashboard:view") && (
+                <Nav.Link active={tab === "dashboard"} onClick={() => setTab("dashboard")} className="d-flex align-items-center gap-3">
+                  <LayoutIcon size={18} /> <span>Дашборд</span>
+                </Nav.Link>
+              )}
+              {hasPerm("alerts:view") && (
+                <Nav.Link active={tab === "alerts"} onClick={() => setTab("alerts")} className="d-flex align-items-center gap-3 position-relative">
+                  <BellIcon size={18} /> <span>Події</span>
+                  {unreadAlerts > 0 && <Badge bg="danger" pill className="ms-auto">{unreadAlerts}</Badge>}
+                </Nav.Link>
+              )}
+              {hasPerm("rules:view") && (
+                <Nav.Link active={tab === "rules"} onClick={() => setTab("rules")} className="d-flex align-items-center gap-3">
+                  <ShieldIcon size={18} /> <span>Правила</span>
+                </Nav.Link>
+              )}
             </Nav>
           </Col>
           <Col md={9} lg={10} className="p-4">
             <div className="tab-content">
-              {tab === "dashboard" && (
+              {tab === "dashboard" && hasPerm("dashboard:view") && (
                 <Stack gap={4}>
                   <Dashboard routerInfo={routerInfo} />
                   <Terminal logs={logs} setLogs={setLogs} packets={packets} setPackets={setPackets} sessionOrder={sessionOrder} setSessionOrder={setSessionOrder} logsContainerRef={logsContainerRef} />
                   <DHCPTable clients={clients} search={search} setSearch={setSearch} />
                 </Stack>
               )}
-              {tab === "alerts" && <Alerts {...alertProps} />}
-              {tab === "rules"  && <Rules {...rulesProps} />}
+              {tab === "alerts" && hasPerm("alerts:view") && <Alerts {...alertProps} />}
+              {tab === "rules"  && hasPerm("rules:view") && <Rules {...rulesProps} />}
             </div>
           </Col>
         </Row>
