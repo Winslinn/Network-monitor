@@ -1,48 +1,89 @@
-import { fmtDate } from "../App";
-import { SEV_ICON } from "./Toasts";
+import { Card, Row, Col, ProgressBar, Stack } from "react-bootstrap";
+import { Cpu, HardDrive, Download, Upload, Network } from "lucide-react";
 
-const barClass = (val) => {
-  if (val > 90) return "bar-fill bar-crit";
-  if (val > 70) return "bar-fill bar-warn";
-  return "bar-fill";
-};
+export default function Dashboard({ routerInfo }) {
+  const getProgressVariant = (val) => {
+    if (val > 90) return "danger";
+    if (val > 70) return "warning";
+    return "primary";
+  };
 
-export default function Dashboard({routerInfo}) {
-    return (
-        <div className="tab-content">
-            <div className="card">
-                <div className="router-name">{routerInfo.hostname}</div>
-                <div className="info-grid">
-                <div className="info-item">
-                    <div className="info-label">LAN IP</div>
-                    <div className="info-value">{routerInfo.ip}</div>
-                </div>
-                <div className="info-item">
-                    <div className="info-label">MAC адреса</div>
-                    <div className="info-value">{routerInfo.mac}</div>
-                </div>
-                </div>
-                <div className="speed-row">
-                <div className="speed-card">
-                    <div className="speed-label">↓ DOWNLOAD</div>
-                    <div className="speed-value speed-dl">{routerInfo.downloadSpeed}</div>
-                </div>
-                <div className="speed-card">
-                    <div className="speed-label">↑ UPLOAD</div>
-                    <div className="speed-value speed-ul">{routerInfo.uploadSpeed}</div>
-                </div>
-                </div>
-                <div className="usage-wrap">
-                <div className="usage-row">
-                    <div className="usage-header"><span>CPU</span><span className="usage-pct">{routerInfo.cpuUsage}%</span></div>
-                    <div className="bar-bg"><div className={barClass(routerInfo.cpuUsage)} style={{ width: `${routerInfo.cpuUsage}%` }} /></div>
-                </div>
-                <div className="usage-row">
-                    <div className="usage-header"><span>RAM</span><span className="usage-pct">{routerInfo.ramUsage}%</span></div>
-                    <div className="bar-bg"><div className="bar-fill bar-ram" style={{ width: `${routerInfo.ramUsage}%` }} /></div>
-                </div>
-                </div>
-            </div>  
+  return (
+    <Card bg="dark" text="light" className="border-secondary shadow-sm">
+      <Card.Body className="p-4">
+        <div className="d-flex align-items-center gap-3 mb-4">
+          <div className="bg-primary bg-opacity-10 p-2 rounded">
+            <Network className="text-primary" size={24} />
+          </div>
+          <div>
+            <h4 className="mb-0 fw-bold">{routerInfo.hostname}</h4>
+            <div className="text-secondary small font-monospace">System Online</div>
+          </div>
         </div>
-    );
+
+        <Row className="g-3 mb-4">
+          <Col sm={6}>
+            <div className="bg-black bg-opacity-25 border border-secondary rounded p-3">
+              <div className="text-secondary small text-uppercase fw-bold mb-1 font-monospace" style={{ fontSize: '0.65rem' }}>LAN IP</div>
+              <div className="fw-bold font-monospace text-primary">{routerInfo.ip}</div>
+            </div>
+          </Col>
+          <Col sm={6}>
+            <div className="bg-black bg-opacity-25 border border-secondary rounded p-3">
+              <div className="text-secondary small text-uppercase fw-bold mb-1 font-monospace" style={{ fontSize: '0.65rem' }}>MAC Address</div>
+              <div className="fw-bold font-monospace text-primary">{routerInfo.mac}</div>
+            </div>
+          </Col>
+        </Row>
+
+        <Row className="g-3 mb-4">
+          <Col xs={6}>
+            <div className="bg-black bg-opacity-25 border border-secondary rounded p-3 text-center">
+              <Download size={16} className="text-info mb-2" />
+              <div className="text-secondary small text-uppercase font-monospace mb-1" style={{ fontSize: '0.6rem' }}>Download</div>
+              <div className="h5 mb-0 fw-bold font-monospace text-info">{routerInfo.downloadSpeed}</div>
+            </div>
+          </Col>
+          <Col xs={6}>
+            <div className="bg-black bg-opacity-25 border border-secondary rounded p-3 text-center">
+              <Upload size={16} className="text-purple mb-2" />
+              <div className="text-secondary small text-uppercase font-monospace mb-1" style={{ fontSize: '0.6rem' }}>Upload</div>
+              <div className="h5 mb-0 fw-bold font-monospace text-purple" style={{ color: '#a78bfa' }}>{routerInfo.uploadSpeed}</div>
+            </div>
+          </Col>
+        </Row>
+
+        <Stack gap={3}>
+          <div>
+            <div className="d-flex justify-content-between mb-2 small font-monospace">
+              <span className="text-secondary d-flex align-items-center gap-2">
+                <Cpu size={14} /> CPU Usage
+              </span>
+              <span className="fw-bold">{routerInfo.cpuUsage}%</span>
+            </div>
+            <ProgressBar 
+              now={routerInfo.cpuUsage} 
+              variant={getProgressVariant(routerInfo.cpuUsage)} 
+              style={{ height: '6px' }} 
+              className="bg-black bg-opacity-50"
+            />
+          </div>
+          <div>
+            <div className="d-flex justify-content-between mb-2 small font-monospace">
+              <span className="text-secondary d-flex align-items-center gap-2">
+                <HardDrive size={14} /> RAM Usage
+              </span>
+              <span className="fw-bold">{routerInfo.ramUsage}%</span>
+            </div>
+            <ProgressBar 
+              now={routerInfo.ramUsage} 
+              variant={getProgressVariant(routerInfo.ramUsage)} 
+              style={{ height: '6px' }} 
+              className="bg-black bg-opacity-50"
+            />
+          </div>
+        </Stack>
+      </Card.Body>
+    </Card>
+  );
 }

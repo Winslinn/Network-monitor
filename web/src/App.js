@@ -1,4 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import { 
+  BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation 
+} from "react-router-dom";
+import { 
+  Container, Navbar, Nav, Row, Col, Badge, 
+  Alert, Button, Spinner, Stack 
+} from "react-bootstrap";
+import { LayoutDashboard as LayoutIcon, Bell as BellIcon, Shield as ShieldIcon, LogOut as LogOutIcon } from "lucide-react";
 
 import "./App.css";
 import Toasts from "./components/Toasts";
@@ -7,7 +15,9 @@ import DHCPTable from "./components/DHCPTable";
 import Dashboard from "./components/Dashboard";
 import Rules from "./components/Rules";
 import Terminal from "./components/Terminal";
+import Login from "./components/Login";
 
+const API_BASE = "http://potyshyi-server:8000";
 const WS_URL = "ws://potyshyi-server:8000/ws";
 const RECONNECT_MS = 3001;
 const PING_INTERVAL = 20000;
@@ -26,10 +36,9 @@ export function fmtDate(iso) {
   } catch { return iso; }
 }
 
-export default function NetworkMonitor() {
-  // ── STATE ──
+function MainLayout({ isAuth, setIsAuth }) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("dashboard");
-  const [now, setNow] = useState(new Date());
   const [wsStatus, setWsStatus] = useState("connecting");
   const [userRole, setUserRole] = useState(null);
   const wsRef = useRef(null);
@@ -59,7 +68,6 @@ export default function NetworkMonitor() {
   
   const logsContainerRef = useRef(null);
 
-  // ── LOGIC & EFFECTS ──
   const addToast = useCallback((message, severity = "medium") => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev.slice(-4), { id, message, severity }]);
@@ -94,7 +102,6 @@ export default function NetworkMonitor() {
         uploadSpeed: r.uploadSpeed || prev.uploadSpeed,
         uptime: r.uptime,
       }));
-      if (msg.logs) setLogs(msg.logs.map(log => ({ ...log, timestamp: log.timestamp || new Date().toISOString() })));
     }
     else if (ctx === "stats") setRouterInfo(prev => ({ ...prev, ...msg }));
     else if (ctx === "log") {
@@ -109,25 +116,16 @@ export default function NetworkMonitor() {
     }
     else if (ctx === "flows") {
       const delta = msg.data || {};
-      if (Object.keys(delta).length === 0) return;
-
       packetsRef.current = { ...packetsRef.current };
       const newKeys = [];
-
       Object.entries(delta).forEach(([sessionKey, flow]) => {
         const isNew = !packetsRef.current[sessionKey];
         packetsRef.current[sessionKey] = {
-          src:          flow.src,
-          dst:          flow.dst,
-          protocol:     flow.protocol,
-          unique_ports: flow.unique_ports,
-          flags:        flow.flags,
-          count:        flow.packet_count,
-          uniqueId:     packetsRef.current[sessionKey]?.uniqueId || Math.random().toString(36).substr(2, 9),
+          ...flow,
+          uniqueId: packetsRef.current[sessionKey]?.uniqueId || Math.random().toString(36).substr(2, 9),
         };
         if (isNew) newKeys.push(sessionKey);
       });
-
       setPackets({ ...packetsRef.current });
       if (newKeys.length > 0) setSessionOrder(prev => [...newKeys, ...prev]);
     }
@@ -137,13 +135,10 @@ export default function NetworkMonitor() {
       addToast(`${TYPE_LABELS[msg.data.type] || msg.data.type}: ${msg.data.description?.slice(0, 60)}`, msg.data.severity);
     }
     else if (ctx === "rules_list") setRules(msg.data || []);
-    else if (ctx === "rule_added" && msg.rule) {
-      setRules(prev => [...prev, msg.rule]);
-      addToast(`Правило додано: ${msg.rule.name}`, "low");
-    }
   }, [addToast]);
 
   const connect = useCallback(() => {
+    if (!isAuth) return;
     if (wsRef.current) wsRef.current.close();
     setWsStatus("connecting");
     const ws = new WebSocket(WS_URL);
@@ -154,12 +149,17 @@ export default function NetworkMonitor() {
       ws.send(JSON.stringify({ action: "get_rules" }));
     };
     ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
-    ws.onclose = () => {
-      setWsStatus("reconnecting");
-      clearInterval(pingTimer.current);
-      setTimeout(connect, RECONNECT_MS);
+    ws.onclose = (e) => {
+      if (e.code === 1008) {
+        setIsAuth(false);
+        navigate("/login");
+      } else {
+        setWsStatus("reconnecting");
+        clearInterval(pingTimer.current);
+        setTimeout(connect, RECONNECT_MS);
+      }
     };
-  }, [handleMessage]);
+  }, [handleMessage, isAuth, navigate, setIsAuth]);
 
   useEffect(() => {
     connect();
@@ -168,114 +168,100 @@ export default function NetworkMonitor() {
 
   useEffect(() => { if (tab === "alerts") setUnreadAlerts(0); }, [tab]);
 
-  useLayoutEffect(() => {
-    if (logsContainerRef.current) logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
-  }, [logs]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   const handleLogout = async () => {
     try {
-      await fetch('http://potyshyi-server:8000/api/logout', { 
-        method: 'POST',
-        credentials: 'include'
-      });
-      setUserRole('guest');
-      connect();
-    } catch (err) {
-      console.error('Logout failed', err);
-    }
+      await fetch(`${API_BASE}/api/logout`, { method: 'POST', credentials: 'include' });
+      setIsAuth(false);
+      navigate("/login");
+    } catch (err) { console.error('Logout failed', err); }
   };
 
-  // ── PROPS ──
   const alertProps = { alerts, alertFilter, setAlertFilter, setAlerts, fmtDate };
   const rulesProps = {
     rules, showAddRule, setShowAddRule, newRule, setNewRule,
-    handleAddRule,
-    wsSend: (p) => wsSend(p),
+    handleAddRule, wsSend: (p) => wsSend(p),
   };
 
-  const PAGE_TITLES = {
-    dashboard: { title: "Дашборд",  sub: "Огляд мережі та системи" },
-    alerts:    { title: "Події",    sub: "Журнал безпеки та сповіщень" },
-    rules:     { title: "Правила",  sub: "Управління правилами виявлення" },
-  };
-
-  const STATUS_LABEL = {
-    ok: "ОК", connecting: "ПІДКЛЮЧЕННЯ", reconnecting: "ПЕРЕПІДКЛЮЧЕННЯ",
-  };
+  const statusVariant = wsStatus === "ok" ? "success" : wsStatus === "reconnecting" ? "warning" : "danger";
 
   return (
-    <>
+    <div className="bg-dark text-light min-vh-100">
       <Toasts toasts={toasts} />
-      
-      <div className="app-shell">
-        {/* ── TOP BAR ── */}
-        <header className="topbar">
-          <div>
-            <span className="topbar-brand">NetWatch</span>
-          </div>
-          <div className="topbar-spacer" />
-          <div className="topbar-status">
-            <div className={`pulse-dot ${wsStatus === "ok" ? "dot-green" : wsStatus === "reconnecting" ? "dot-yellow" : "dot-red"}`} />
-            {STATUS_LABEL[wsStatus] || wsStatus.toUpperCase()}
-          </div>
-          <div className="topbar-time">
-            {routerInfo.uptime}
-          </div>
-        </header>
+      <Navbar bg="dark" variant="dark" className="border-bottom border-secondary px-3 sticky-top">
+        <Navbar.Brand className="fw-bold"><ShieldIcon className="me-2 text-primary" /> NetWatch</Navbar.Brand>
+        <Nav className="ms-auto align-items-center">
+          <Badge bg={statusVariant} className="me-2 py-2 px-3 rounded-pill text-uppercase" style={{ fontSize: '0.7rem' }}>
+            {wsStatus.toUpperCase()}
+          </Badge>
+          <div className="text-secondary small font-monospace bg-black bg-opacity-25 border border-secondary px-3 py-1 rounded-pill">{routerInfo.uptime}</div>
+          <Button variant="link" className="text-secondary p-0 ms-3" onClick={handleLogout}><LogOutIcon size={18} /></Button>
+        </Nav>
+      </Navbar>
 
-        <div className="app-body">
-          {/* ── SIDEBAR ── */}
-          <nav className="sidebar">
-            <span className="sidebar-section-label">Навігація</span>
-            <button className={`nav-btn ${tab === "dashboard" ? "active" : ""}`} onClick={() => setTab("dashboard")}>
-              <span className="nav-icon">🖥</span><span>Дашборд</span>
-            </button>
-            <button className={`nav-btn ${tab === "alerts" ? "active" : ""}`} onClick={() => setTab("alerts")}>
-              <span className="nav-icon">🔔</span><span>Події</span>
-              {unreadAlerts > 0 && <span className="nav-badge">{unreadAlerts}</span>}
-            </button>
-            <button className={`nav-btn ${tab === "rules" ? "active" : ""}`} onClick={() => setTab("rules")}>
-              <span className="nav-icon">🛡</span><span>Правила</span>
-            </button>
-          </nav>
-
-          {/* ── MAIN CONTENT ── */}
-          <main className="main-content">
-            <div className="page-header">
-              <div className="page-title">{PAGE_TITLES[tab].title}</div>
-              <div className="page-subtitle">{PAGE_TITLES[tab].sub}</div>
+      <Container fluid className="p-0">
+        <Row className="g-0">
+          <Col md={3} lg={2} className="bg-dark border-end border-secondary min-vh-100 p-3 d-none d-md-block sticky-top" style={{ top: '56px', height: 'calc(100vh - 56px)' }}>
+            <Nav variant="pills" className="flex-column gap-1">
+              <Nav.Link active={tab === "dashboard"} onClick={() => setTab("dashboard")} className="d-flex align-items-center gap-3">
+                <LayoutIcon size={18} /> <span>Дашборд</span>
+              </Nav.Link>
+              <Nav.Link active={tab === "alerts"} onClick={() => setTab("alerts")} className="d-flex align-items-center gap-3 position-relative">
+                <BellIcon size={18} /> <span>Події</span>
+                {unreadAlerts > 0 && <Badge bg="danger" pill className="ms-auto">{unreadAlerts}</Badge>}
+              </Nav.Link>
+              <Nav.Link active={tab === "rules"} onClick={() => setTab("rules")} className="d-flex align-items-center gap-3">
+                <ShieldIcon size={18} /> <span>Правила</span>
+              </Nav.Link>
+            </Nav>
+          </Col>
+          <Col md={9} lg={10} className="p-4">
+            <div className="tab-content">
+              {tab === "dashboard" && (
+                <Stack gap={4}>
+                  <Dashboard routerInfo={routerInfo} />
+                  <Terminal logs={logs} setLogs={setLogs} packets={packets} setPackets={setPackets} sessionOrder={sessionOrder} setSessionOrder={setSessionOrder} logsContainerRef={logsContainerRef} />
+                  <DHCPTable clients={clients} search={search} setSearch={setSearch} />
+                </Stack>
+              )}
+              {tab === "alerts" && <Alerts {...alertProps} />}
+              {tab === "rules"  && <Rules {...rulesProps} />}
             </div>
+          </Col>
+        </Row>
+      </Container>
+    </div>
+  );
+}
 
-            {(wsStatus === "reconnecting" || wsStatus === "connecting") && (
-              <div className={`ws-banner ${wsStatus}`}>
-                <div className={`pulse-dot ${wsStatus === "reconnecting" ? "dot-yellow" : "dot-red"}`} />
-                {wsStatus === "reconnecting" ? "Перепідключення..." : "Підключення..."}
-              </div>
-            )}
+export default function App() {
+  const [isAuth, setIsAuth] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
 
-            {tab === "dashboard" && (
-              <>
-                <Dashboard routerInfo={routerInfo} />
-                <Terminal 
-                  logs={logs} setLogs={setLogs} 
-                  packets={packets} setPackets={setPackets}
-                  sessionOrder={sessionOrder} setSessionOrder={setSessionOrder}
-                  logsContainerRef={logsContainerRef}
-                />
-                <DHCPTable clients={clients} search={search} setSearch={setSearch} />
-              </>
-            )}
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+      setIsAuth(res.ok);
+    } catch (err) {
+      setIsAuth(false);
+    } finally {
+      setAuthChecking(false);
+    }
+  }, []);
 
-            {tab === "alerts" && <Alerts {...alertProps} />}
-            {tab === "rules"  && <Rules {...rulesProps} />}
-          </main>
-        </div>
-      </div>
-    </>
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  if (authChecking) {
+    return <div className="bg-dark text-light min-vh-100 d-flex align-items-center justify-content-center"><Spinner animation="border" variant="primary" /></div>;
+  }
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={isAuth ? <Navigate to="/" /> : <Login onLoginSuccess={() => setIsAuth(true)} />} />
+        <Route path="/*" element={isAuth ? <MainLayout isAuth={isAuth} setIsAuth={setIsAuth} /> : <Navigate to="/login" />} />
+      </Routes>
+    </Router>
   );
 }

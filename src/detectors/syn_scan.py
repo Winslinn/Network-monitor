@@ -13,10 +13,11 @@ SYN_ACK = 0x12
 SEVERITY = 'medium'
 DESCRIPTION = "Потенційне SYN сканування: багато SYN+ACK з відповідями RST+ACK"
 
-MIN_PORTS  = 15
-RST_RATIO  = 0.7
-
 class SynScanDetector:
+    def __init__(self):
+        self.MIN_PORTS  = 15
+        self.RST_RATIO  = 0.7
+
     def analyze(self, flow: dict) -> dict | None:
         if flow['protocol'] != 6:
             return None
@@ -34,8 +35,8 @@ class SynScanDetector:
         ports_per_sec = unique_ports / duration if duration > 0 else unique_ports
 
         if (
-            unique_ports  >= MIN_PORTS
-            and rst_ack_count / total_packets >= RST_RATIO
+            unique_ports  >= self.MIN_PORTS
+            and rst_ack_count / total_packets >= self.RST_RATIO
             and syn_ack_count > 0
             and ports_per_sec >= 1
         ):

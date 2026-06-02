@@ -1,14 +1,23 @@
-import asyncio, json, uvicorn, uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie
+import asyncio, json, uvicorn, jwt, datetime
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 
 import utils.database as db
 from utils.database import Session, Router, init_db
 from utils.logmanager import watch_logs, watch_flows, watch_results
 from core.router import init as init_router, router_manager
 from utils.snmp import close_snmp
+
+SECRET_KEY = "your-super-secret-key-that-is-at-least-32-characters-long"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,26 +65,69 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def get_user_role(user_id: Optional[str]) -> str:
-    if not user_id: return "guest"
-    user = db.get_user(user_id)
-    return user.get("role", "guest") if user else "guest"
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-@app.get("/api/auth")
-def auth(response: Response, user_id: Optional[str] = Cookie(default=None)):
-    if not user_id:
-        user_id = str(uuid.uuid4())
-        response.set_cookie(key="user_id", value=user_id, httponly=True, samesite="lax")
+def get_current_user_from_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        return db.get_user(username)
+    except jwt.PyJWTError:
+        return None
+
+@app.post("/api/login")
+async def login(request: LoginRequest, response: Response):
+    user = db.get_user(request.username)
+    if not user or not db.verify_password(request.password, user["pwrd"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password"
+        )
     
-    user_data = db.get_user(user_id)
-    if not user_data:
-        user_data = db.create_user(user_id)
-        
-    return {"uuid": user_data["uuid"], "role": user_data["role"]}
+    token = create_access_token(data={"sub": user["username"]})
+    response.set_cookie(
+        key="access_token", 
+        value=token, 
+        httponly=True, 
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    return {"status": "ok"}
+
+@app.get("/api/me")
+async def get_me(access_token: Optional[str] = Cookie(default=None)):
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    user = get_current_user_from_token(access_token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    return {"username": user["username"], "roles": user["roles"]}
+
+@app.post("/api/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    return {"status": "ok"}
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = Cookie(default=None)):
-    role = get_user_role(user_id)
+async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] = Cookie(default=None)):
+    if not access_token:
+        await websocket.close(code=1008)
+        return
+    
+    user = get_current_user_from_token(access_token)
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+    role = user["roles"][0] if user["roles"] else "guest"
 
     with Session() as session:
         router = session.query(Router).first()
