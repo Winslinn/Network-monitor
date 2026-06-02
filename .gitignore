@@ -1,6 +1,7 @@
 # Ignoring node modules and source files
 **/node_modules/
 **/config/
+src/network.db
 
 # Ignoring build artifacts
 **/build/
@@ -20,3 +21,4 @@ __pycache__/
 # Ignoring React build artifacts
 **/node_modules
 **/public
+
