@@ -1,19 +1,21 @@
 import asyncio, json, uvicorn, jwt, datetime
+import utils.database as db
+
+from os import getenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
-import utils.database as db
 from utils.database import Session, Router, init_db
 from utils.logmanager import watch_logs, watch_flows, watch_results
 from core.router import init as init_router, router_manager
 from utils.snmp import close_snmp
 
-SECRET_KEY = "your-super-secret-key-that-is-at-least-32-characters-long"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
+SECRET_KEY = getenv("SECRET_KEY")
+ALGORITHM = getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 class LoginRequest(BaseModel):
     username: str
@@ -32,8 +34,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://potyshyi-server:3001", 
-        "http://localhost:3001", 
-        "http://127.0.0.1:3001"
+        "http://potyshyi-server",
     ], 
     allow_credentials=True,
     allow_methods=["*"],
@@ -67,7 +68,7 @@ manager = ConnectionManager()
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.datetime.utcnow() + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

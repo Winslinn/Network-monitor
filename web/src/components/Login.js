@@ -16,6 +16,7 @@ export default function Login({ onLoginSuccess }) {
     try {
       const response = await fetch("http://potyshyi-server:8000/api/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });

@@ -2,7 +2,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker, DeclarativeBase, relationship
 from sqlalchemy.inspection import inspect
 from typing import List, Optional, Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 
 engine = sa.create_engine("sqlite:///network.db", echo=False)
@@ -73,14 +73,14 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(unique=True, index=True)
     pwrd: Mapped[str] = mapped_column()
-    first_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    first_seen: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     
     roles: Mapped[List["Role"]] = relationship(secondary=role_user, backref="users")
 
 class Alert(Base):
     __tablename__ = "alerts"
     id: Mapped[int] = mapped_column(primary_key=True)
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     type: Mapped[str] = mapped_column()
     severity: Mapped[str] = mapped_column()
     src_ip: Mapped[Optional[str]] = mapped_column()
@@ -103,18 +103,55 @@ class Rule(Base):
 def init_db():
     Base.metadata.create_all(engine)
     with Session() as session:
+        # Create default permissions
+        permissions_list = [
+            ("rules:view", "Permission to view rules"),
+            ("rules:edit", "Permission to add or delete rules"),
+            ("alerts:view", "Permission to view alerts history"),
+            ("dashboard:view", "Permission to view dashboard and clients"),
+        ]
+        
+        db_permissions = {}
+        for p_name, p_desc in permissions_list:
+            perm = session.execute(sa.select(Permission).filter_by(name=p_name)).scalar_one_or_none()
+            if not perm:
+                perm = Permission(name=p_name, description=p_desc)
+                session.add(perm)
+            db_permissions[p_name] = perm
+        
+        session.commit()
+
+        # Ensure admin and analyst roles exist
+        admin_role = session.execute(sa.select(Role).filter_by(name="admin")).scalar_one_or_none()
+        if not admin_role:
+            admin_role = Role(name="admin")
+            session.add(admin_role)
+        
+        analyst_role = session.execute(sa.select(Role).filter_by(name="analyst")).scalar_one_or_none()
+        if not analyst_role:
+            analyst_role = Role(name="analyst")
+            session.add(analyst_role)
+        
+        session.commit()
+
+        # Assign permissions to roles
+        # Admin gets everything
+        for perm in db_permissions.values():
+            if perm not in admin_role.permissions:
+                admin_role.permissions.append(perm)
+        
+        # Analyst gets viewing permissions
+        for p_name in ["rules:view", "alerts:view", "dashboard:view"]:
+            if db_permissions[p_name] not in analyst_role.permissions:
+                analyst_role.permissions.append(db_permissions[p_name])
+        
+        session.commit()
+
         user_count = session.query(sa.func.count(User.id)).scalar()
         if user_count == 0:
             import secrets
             import string
             
-            # Створюємо роль admin, якщо її немає
-            admin_role = session.execute(sa.select(Role).filter_by(name="admin")).scalar_one_or_none()
-            if not admin_role:
-                admin_role = Role(name="admin")
-                session.add(admin_role)
-            
-            # Генеруємо випадковий пароль
             alphabet = string.ascii_letters + string.digits
             password = ''.join(secrets.choice(alphabet) for i in range(12))
             username = "admin"
@@ -130,10 +167,21 @@ def init_db():
 
 def get_user(username: str) -> Optional[Dict[str, Any]]:
     with Session() as session:
-        u = session.execute(sa.select(User).filter_by(username=username)).scalar_one_or_none()
+        u = session.execute(sa.select(User).options(
+            sa.orm.selectinload(User.roles).selectinload(Role.permissions)
+        ).filter_by(username=username)).scalar_one_or_none()
+        
         if not u: return None
+        
         res = u.to_dict()
         res["roles"] = [r.name for r in u.roles]
+        
+        permissions = set()
+        for r in u.roles:
+            for p in r.permissions:
+                permissions.add(p.name)
+        res["permissions"] = list(permissions)
+        
         return res
 
 def create_user(username: str, password: str, roles: List[str] = ["guest"]) -> Dict[str, Any]:
