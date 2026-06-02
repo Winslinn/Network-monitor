@@ -7,7 +7,6 @@ import DHCPTable from "./components/DHCPTable";
 import Dashboard from "./components/Dashboard";
 import Rules from "./components/Rules";
 import Terminal from "./components/Terminal";
-import Login from "./components/Login";
 
 const WS_URL = "ws://potyshyi-server:8000/ws";
 const RECONNECT_MS = 3001;
@@ -178,11 +177,6 @@ export default function NetworkMonitor() {
     return () => clearInterval(t);
   }, []);
 
-  const onLoginSuccess = (role) => {
-    setUserRole(role);
-    connect(); // Reconnect to update role context in WebSocket
-  };
-
   const handleLogout = async () => {
     try {
       await fetch('http://potyshyi-server:8000/api/logout', { 
@@ -214,10 +208,6 @@ export default function NetworkMonitor() {
     ok: "ОК", connecting: "ПІДКЛЮЧЕННЯ", reconnecting: "ПЕРЕПІДКЛЮЧЕННЯ",
   };
 
-  if (userRole === "guest") {
-    return <Login onLoginSuccess={onLoginSuccess} />;
-  }
-
   return (
     <>
       <Toasts toasts={toasts} />
@@ -236,9 +226,6 @@ export default function NetworkMonitor() {
           <div className="topbar-time">
             {routerInfo.uptime}
           </div>
-          <button onClick={handleLogout} className="logout-btn" title="Вихід">
-            🚪
-          </button>
         </header>
 
         <div className="app-body">
