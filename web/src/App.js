@@ -31,6 +31,7 @@ export default function NetworkMonitor() {
   const [tab, setTab] = useState("dashboard");
   const [now, setNow] = useState(new Date());
   const [wsStatus, setWsStatus] = useState("connecting");
+  const [userRole, setUserRole] = useState(null);
   const wsRef = useRef(null);
   const pingTimer = useRef(null);
 
@@ -58,10 +59,6 @@ export default function NetworkMonitor() {
   
   const logsContainerRef = useRef(null);
 
-  // ── PROPS ──
-  const alertProps = { alerts, alertFilter, setAlertFilter, setAlerts, fmtDate };
-  const rulesProps = { rules, showAddRule, setShowAddRule, newRule, setNewRule, wsSend: (p) => wsSend(p) };
-
   // ── LOGIC & EFFECTS ──
   const addToast = useCallback((message, severity = "medium") => {
     const id = Date.now() + Math.random();
@@ -71,10 +68,18 @@ export default function NetworkMonitor() {
 
   const wsSend = (p) => wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(p));
 
+  const handleAddRule = useCallback(() => {
+    if (!newRule.name.trim()) return;
+    wsSend({ action: "add_rule", rule: newRule });
+    setNewRule({ name: "", type: "custom", severity: "medium", description: "", pattern: "" });
+    setShowAddRule(false);
+  }, [newRule]);
+
   const handleMessage = useCallback((msg) => {
     const ctx = msg.context;
     if (ctx === "initial") {
       const r = msg.router || {};
+      setUserRole(msg.role);
       setClients(msg.dhcp || []);
       setRouterInfo(prev => ({
         ...prev,
@@ -93,17 +98,13 @@ export default function NetworkMonitor() {
     }
     else if (ctx === "stats") setRouterInfo(prev => ({ ...prev, ...msg }));
     else if (ctx === "log") {
-      console.log(msg.data);
       setLogs(prev => [...prev.slice(-199), { ...msg.data, timestamp: new Date().toISOString(), id: Date.now() + Math.random() }]);
     }
     else if (ctx === "dhcp") {
       setClients(prev => {
         const exists = prev.find(c => c.id === msg.data.id);
-        if (exists) {
-          return prev.map(c => c.id === msg.data.id ? msg.data : c);
-        } else {
-          return [...prev, msg.data];
-        }
+        if (exists) return prev.map(c => c.id === msg.data.id ? msg.data : c);
+        return [...prev, msg.data];
       });
     }
     else if (ctx === "flows") {
@@ -111,12 +112,10 @@ export default function NetworkMonitor() {
       if (Object.keys(delta).length === 0) return;
 
       packetsRef.current = { ...packetsRef.current };
-      
       const newKeys = [];
 
       Object.entries(delta).forEach(([sessionKey, flow]) => {
         const isNew = !packetsRef.current[sessionKey];
-
         packetsRef.current[sessionKey] = {
           src:          flow.src,
           dst:          flow.dst,
@@ -126,15 +125,11 @@ export default function NetworkMonitor() {
           count:        flow.packet_count,
           uniqueId:     packetsRef.current[sessionKey]?.uniqueId || Math.random().toString(36).substr(2, 9),
         };
-
         if (isNew) newKeys.push(sessionKey);
       });
 
       setPackets({ ...packetsRef.current });
-
-      if (newKeys.length > 0) {
-        setSessionOrder(prev => [...newKeys, ...prev]);
-      }
+      if (newKeys.length > 0) setSessionOrder(prev => [...newKeys, ...prev]);
     }
     else if (ctx === "alert") {
       setAlerts(prev => [{ ...msg.data, _received: Date.now() }, ...prev].slice(0, 200));
@@ -182,10 +177,35 @@ export default function NetworkMonitor() {
     return () => clearInterval(t);
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await fetch('http://potyshyi-server:8000/api/logout', { 
+        method: 'POST',
+        credentials: 'include'
+      });
+      setUserRole('guest');
+      connect();
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+  };
+
+  // ── PROPS ──
+  const alertProps = { alerts, alertFilter, setAlertFilter, setAlerts, fmtDate };
+  const rulesProps = {
+    rules, showAddRule, setShowAddRule, newRule, setNewRule,
+    handleAddRule,
+    wsSend: (p) => wsSend(p),
+  };
+
   const PAGE_TITLES = {
-    dashboard: { title: "Дашборд", sub: "Огляд мережі та системи" },
+    dashboard: { title: "Дашборд",  sub: "Огляд мережі та системи" },
     alerts:    { title: "Події",    sub: "Журнал безпеки та сповіщень" },
-    rules:     { title: "Правила", sub: "Управління правилами виявлення" },
+    rules:     { title: "Правила",  sub: "Управління правилами виявлення" },
+  };
+
+  const STATUS_LABEL = {
+    ok: "ОК", connecting: "ПІДКЛЮЧЕННЯ", reconnecting: "ПЕРЕПІДКЛЮЧЕННЯ",
   };
 
   return (
@@ -195,16 +215,17 @@ export default function NetworkMonitor() {
       <div className="app-shell">
         {/* ── TOP BAR ── */}
         <header className="topbar">
-          <div className="topbar-logo">📡</div>
           <div>
             <span className="topbar-brand">NetWatch</span>
           </div>
           <div className="topbar-spacer" />
           <div className="topbar-status">
             <div className={`pulse-dot ${wsStatus === "ok" ? "dot-green" : wsStatus === "reconnecting" ? "dot-yellow" : "dot-red"}`} />
-            {wsStatus.toUpperCase()}
+            {STATUS_LABEL[wsStatus] || wsStatus.toUpperCase()}
           </div>
-          <div className="topbar-time">{routerInfo.uptime}</div>
+          <div className="topbar-time">
+            {routerInfo.uptime}
+          </div>
         </header>
 
         <div className="app-body">
@@ -212,14 +233,14 @@ export default function NetworkMonitor() {
           <nav className="sidebar">
             <span className="sidebar-section-label">Навігація</span>
             <button className={`nav-btn ${tab === "dashboard" ? "active" : ""}`} onClick={() => setTab("dashboard")}>
-              <span className="nav-icon"></span><span>Дашборд</span>
+              <span className="nav-icon">🖥</span><span>Дашборд</span>
             </button>
             <button className={`nav-btn ${tab === "alerts" ? "active" : ""}`} onClick={() => setTab("alerts")}>
-              <span className="nav-icon"></span><span>Події</span>
+              <span className="nav-icon">🔔</span><span>Події</span>
               {unreadAlerts > 0 && <span className="nav-badge">{unreadAlerts}</span>}
             </button>
             <button className={`nav-btn ${tab === "rules" ? "active" : ""}`} onClick={() => setTab("rules")}>
-              <span className="nav-icon"></span><span>Правила</span>
+              <span className="nav-icon">🛡</span><span>Правила</span>
             </button>
           </nav>
 
@@ -251,7 +272,7 @@ export default function NetworkMonitor() {
             )}
 
             {tab === "alerts" && <Alerts {...alertProps} />}
-            {tab === "rules" && <Rules {...rulesProps} />}
+            {tab === "rules"  && <Rules {...rulesProps} />}
           </main>
         </div>
       </div>
