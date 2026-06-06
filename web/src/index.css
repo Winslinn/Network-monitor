@@ -1,12 +1,116 @@
+/* ── NetWatch Design Tokens ── */
+:root {
+  --nw-bg:         #05080e;
+  --nw-surface:    #0b1018;
+  --nw-inset:      #040710;
+  --nw-border:     #162030;
+  --nw-text:       #cfd9ea;
+  --nw-muted:      #4e6580;
+  --nw-accent:     #0dcaaa;
+  --nw-accent-bg:  rgba(13, 202, 170, .10);
+  --nw-accent-dim: rgba(13, 202, 170, .06);
+  --nw-success:    #22c55e;
+  --nw-warning:    #f59e0b;
+  --nw-danger:     #f43f5e;
+  --nw-info:       #38bdf8;
+  --nw-purple:     #a78bfa;
+
+  /* Bootstrap overrides */
+  --bs-body-bg:        var(--nw-bg);
+  --bs-body-color:     var(--nw-text);
+  --bs-border-color:   var(--nw-border);
+  --bs-dark-rgb:       11, 16, 24;
+  --bs-black-rgb:      4, 7, 16;
+  --bs-primary-rgb:    13, 202, 170;
+  --bs-success-rgb:    34, 197, 94;
+  --bs-warning-rgb:    245, 158, 11;
+  --bs-danger-rgb:     244, 63, 94;
+  --bs-info-rgb:       56, 189, 248;
+  --bs-secondary-color: var(--nw-muted);
+  --bs-link-color:     var(--nw-accent);
+  --bs-link-hover-color: var(--nw-accent);
+}
+
 body {
   margin: 0;
-  background-color: #0a0c10;
-  color: #e2e8f0;
+  background-color: var(--nw-bg);
+  color: var(--nw-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Text */
+.text-secondary { color: var(--nw-muted) !important; }
+.text-primary   { color: var(--nw-accent) !important; }
+.text-info      { color: var(--nw-info)   !important; }
+.text-success   { color: var(--nw-success)!important; }
+.text-warning   { color: var(--nw-warning)!important; }
+.text-danger    { color: var(--nw-danger) !important; }
+
+/* Backgrounds */
+.bg-primary  { background-color: var(--nw-accent)  !important; }
+.bg-success  { background-color: var(--nw-success) !important; }
+.bg-warning  { background-color: var(--nw-warning) !important; }
+.bg-danger   { background-color: var(--nw-danger)  !important; }
+.bg-info     { background-color: var(--nw-info)    !important; }
+.border-secondary { border-color: var(--nw-border) !important; }
+
+/* Buttons */
+.btn-primary {
+  --bs-btn-bg: var(--nw-accent);
+  --bs-btn-border-color: var(--nw-accent);
+  --bs-btn-hover-bg: #0aaa8e;
+  --bs-btn-hover-border-color: #0aaa8e;
+  --bs-btn-active-bg: #0aaa8e;
+  --bs-btn-color: #000;
+  --bs-btn-hover-color: #000;
+}
+.btn-outline-secondary {
+  --bs-btn-color: var(--nw-muted);
+  --bs-btn-border-color: var(--nw-border);
+  --bs-btn-hover-bg: rgba(255,255,255,.04);
+  --bs-btn-hover-color: var(--nw-text);
+  --bs-btn-hover-border-color: var(--nw-muted);
+}
+.btn-outline-danger {
+  --bs-btn-color: var(--nw-danger);
+  --bs-btn-border-color: var(--nw-danger);
+}
+
+/* Forms */
+.form-control, .form-select {
+  background-color: var(--nw-inset) !important;
+  border-color: var(--nw-border) !important;
+  color: var(--nw-text) !important;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--nw-accent) !important;
+  box-shadow: 0 0 0 .2rem var(--nw-accent-bg) !important;
+}
+.form-control::placeholder { color: var(--nw-muted) !important; opacity: .5; }
+.form-select option { background-color: var(--nw-surface); }
+
+.input-group-text {
+  background-color: var(--nw-inset) !important;
+  border-color: var(--nw-border) !important;
+  color: var(--nw-muted) !important;
+}
+
+/* Progress */
+.progress { background-color: var(--nw-inset) !important; }
+
+/* Table */
+.table-dark {
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--nw-border);
+  --bs-table-hover-bg: var(--nw-accent-dim);
+  color: var(--nw-text) !important;
+}
+
+/* Toasts */
+.toast          { border-color: var(--nw-border) !important; }
+.toast-header   { border-bottom-color: var(--nw-border) !important; }
+
 code {
-  font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }

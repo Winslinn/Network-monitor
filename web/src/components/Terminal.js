@@ -1,131 +1,215 @@
-import React from 'react';
-import { Card, Button, Row, Col, Badge, ListGroup } from 'react-bootstrap';
-import { Terminal as TerminalIcon, Activity, Trash2 } from 'lucide-react';
+import { Row, Col, Badge } from "react-bootstrap";
+import { Terminal as TerminalIcon, Activity, Trash2 } from "lucide-react";
 
-export default function Terminal({ 
-  logs, 
-  setLogs, 
-  packets, 
-  setPackets, 
-  sessionOrder, 
-  setSessionOrder, 
-  logsContainerRef 
+const PANEL_STYLE = {
+  background: "var(--nw-surface)",
+  border: "1px solid var(--nw-border)",
+  borderRadius: 14,
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const HEADER_STYLE = {
+  display: "flex", alignItems: "center", justifyContent: "space-between",
+  padding: ".9rem 1.1rem",
+  borderBottom: "1px solid var(--nw-border)",
+  flexShrink: 0,
+};
+
+const LOG_PANE_STYLE = {
+  height: 340,
+  overflowY: "auto",
+  padding: ".75rem 1rem",
+  background: "var(--nw-inset)",
+  fontFamily: "JetBrains Mono, monospace",
+  fontSize: ".72rem",
+};
+
+function ClearBtn({ onClick, title }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: "none", border: "none", cursor: "pointer", padding: 5,
+        lineHeight: 0, borderRadius: 6,
+        color: "var(--nw-muted)", transition: "color .15s, background .15s",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.color = "var(--nw-danger)";
+        e.currentTarget.style.background = "rgba(244,63,94,.08)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = "var(--nw-muted)";
+        e.currentTarget.style.background = "none";
+      }}
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+function parseFlagBits(flagValue) {
+  const val = parseInt(flagValue, 10);
+  if (isNaN(val)) return String(flagValue);
+  const labels = [];
+  if (val & 0x01) labels.push("FIN");
+  if (val & 0x02) labels.push("SYN");
+  if (val & 0x04) labels.push("RST");
+  if (val & 0x08) labels.push("PSH");
+  if (val & 0x10) labels.push("ACK");
+  if (val & 0x20) labels.push("URG");
+  return labels.length ? labels.join("+") : `0x${val.toString(16).toUpperCase()}`;
+}
+
+export default function Terminal({
+  logs, setLogs,
+  packets, setPackets,
+  sessionOrder, setSessionOrder,
+  logsContainerRef,
 }) {
-
-  const getFlagName = (flagValue) => {
-    const val = parseInt(flagValue, 10);
-    if (isNaN(val)) return flagValue;
-    const labels = [];
-    if (val & 0x01) labels.push('FIN');
-    if (val & 0x02) labels.push('SYN');
-    if (val & 0x04) labels.push('RST');
-    if (val & 0x08) labels.push('PSH');
-    if (val & 0x10) labels.push('ACK');
-    if (val & 0x20) labels.push('URG');
-    return labels.length > 0 ? labels.join('+') : `0x${val.toString(16).toUpperCase()}`;
-  };
-
   return (
     <Row className="g-4">
-      {/* СИСТЕМНІ ЛОГИ */}
+      {/* System logs */}
       <Col lg={6}>
-        <Card bg="dark" text="light" className="border-secondary h-100 shadow-sm">
-          <Card.Header className="bg-transparent border-secondary py-3 d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center gap-2">
-              <TerminalIcon size={18} className="text-info" />
-              <Card.Title className="mb-0 fw-bold small text-uppercase font-monospace">System Logs</Card.Title>
+        <div style={PANEL_STYLE}>
+          <div style={HEADER_STYLE}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TerminalIcon size={15} color="var(--nw-info)" />
+              <span style={{
+                fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: ".06em", color: "var(--nw-text)",
+              }}>
+                Системні логи
+              </span>
             </div>
-            <Button variant="outline-secondary" size="sm" onClick={() => setLogs([])} className="p-1 px-2 border-0 opacity-50 hover-opacity-100">
-              <Trash2 size={14} />
-            </Button>
-          </Card.Header>
-          <Card.Body className="p-0">
-            <div 
-              className="font-monospace p-3 overflow-auto" 
-              style={{ height: '350px', fontSize: '0.75rem', backgroundColor: '#050505' }}
-              ref={logsContainerRef}
-            >
-              {logs.length === 0 ? (
-                <div className="text-secondary text-center py-5 opacity-50">Логи відсутні</div>
-              ) : (
-                logs.map((log, idx) => (
-                  <div key={idx} className="d-flex gap-3 mb-1 border-bottom border-secondary border-opacity-25 pb-1">
-                    <span className="text-secondary opacity-50" style={{ minWidth: '70px' }}>
-                      [{new Date(log.timestamp).toLocaleTimeString()}]
-                    </span>
-                    <span className={log.type === 'alert' ? 'text-danger fw-bold' : 'text-light'}>
-                      {log.message}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card.Body>
-        </Card>
+            <ClearBtn onClick={() => setLogs([])} title="Очистити логи" />
+          </div>
+
+          <div style={LOG_PANE_STYLE} ref={logsContainerRef}>
+            {logs.length === 0 ? (
+              <div style={{ color: "var(--nw-muted)", textAlign: "center", padding: "3rem 0", opacity: .4 }}>
+                Логи відсутні
+              </div>
+            ) : (
+              logs.map((log) => (
+                <div
+                  key={log.id || log.timestamp}
+                  style={{
+                    display: "flex", gap: 12, marginBottom: 4,
+                    paddingBottom: 4,
+                    borderBottom: "1px solid rgba(255,255,255,.04)",
+                  }}
+                >
+                  <span style={{ color: "var(--nw-muted)", opacity: .5, minWidth: 72, flexShrink: 0 }}>
+                    [{new Date(log.timestamp).toLocaleTimeString("uk-UA")}]
+                  </span>
+                  <span style={{ color: log.type === "alert" ? "var(--nw-danger)" : "var(--nw-text)", fontWeight: log.type === "alert" ? 600 : 400 }}>
+                    {log.message}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </Col>
 
-      {/* FLOWS */}
+      {/* Network flows */}
       <Col lg={6}>
-        <Card bg="dark" text="light" className="border-secondary h-100 shadow-sm">
-          <Card.Header className="bg-transparent border-secondary py-3 d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center gap-2">
-              <Activity size={18} className="text-success" />
-              <Card.Title className="mb-0 fw-bold small text-uppercase font-monospace">Network Flows</Card.Title>
+        <div style={PANEL_STYLE}>
+          <div style={HEADER_STYLE}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Activity size={15} color="var(--nw-success)" />
+              <span style={{
+                fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: ".06em", color: "var(--nw-text)",
+              }}>
+                Мережеві потоки
+              </span>
             </div>
-            <Button variant="outline-secondary" size="sm" onClick={() => { setPackets({}); setSessionOrder([]); }} className="p-1 px-2 border-0 opacity-50 hover-opacity-100">
-              <Trash2 size={14} />
-            </Button>
-          </Card.Header>
-          <Card.Body className="p-0">
-            <div 
-              className="p-3 overflow-auto" 
-              style={{ height: '350px', backgroundColor: '#050505' }}
-            >
-              {sessionOrder.length === 0 ? (
-                <div className="text-secondary text-center py-5 opacity-50 font-monospace" style={{ fontSize: '0.75rem' }}>Активність відсутня</div>
-              ) : (
-                sessionOrder.map((key) => {
-                  const flow = packets[key];
-                  if (!flow) return null;
-                  const flags  = flow.flags  || {};
+            <ClearBtn onClick={() => { setPackets({}); setSessionOrder([]); }} title="Очистити потоки" />
+          </div>
 
-                  return (
-                    <div key={key} className="bg-dark border border-secondary rounded p-2 mb-2 font-monospace" style={{ fontSize: '0.7rem' }}>
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <div className="d-flex align-items-center gap-2">
-                          <Badge bg={flow.protocol === 6 ? 'primary' : 'info'} style={{ fontSize: '0.6rem' }}>
-                            {flow.protocol === 6 ? 'TCP' : flow.protocol === 17 ? 'UDP' : `IP-${flow.protocol}`}
-                          </Badge>
-                          <span className="fw-bold">{flow.src}</span>
-                          <span className="text-secondary">→</span>
-                          <span className="fw-bold">{flow.dst}</span>
-                        </div>
-                        <div className="text-secondary">
-                          Pkt: <span className="text-light fw-bold">{flow.count}</span>
-                        </div>
-                      </div>
+          <div style={{ ...LOG_PANE_STYLE, fontFamily: undefined }} ref={undefined}>
+            {sessionOrder.length === 0 ? (
+              <div style={{
+                color: "var(--nw-muted)", textAlign: "center",
+                padding: "3rem 0", opacity: .4,
+                fontFamily: "JetBrains Mono, monospace", fontSize: ".72rem",
+              }}>
+                Активність відсутня
+              </div>
+            ) : (
+              sessionOrder.map((key) => {
+                const flow = packets[key];
+                if (!flow) return null;
+                const flags = flow.flags || {};
+                const proto = flow.protocol === 6 ? "TCP" : flow.protocol === 17 ? "UDP" : `IP-${flow.protocol}`;
+                const protoColor = flow.protocol === 6 ? "var(--nw-accent)" : "var(--nw-info)";
 
-                      {flow.protocol === 6 && Object.keys(flags).length > 0 && (
-                        <div className="d-flex flex-wrap gap-1 mt-1">
-                          {Object.entries(flags).map(([flag, count]) => (
-                            <Badge 
-                              key={flag} 
-                              bg="dark" 
-                              className="border border-secondary text-secondary fw-normal"
-                              style={{ fontSize: '0.6rem' }}
-                            >
-                              {getFlagName(flag)}: <span className="text-light">{count}</span>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      background: "rgba(255,255,255,.025)",
+                      border: "1px solid var(--nw-border)",
+                      borderRadius: 7, padding: ".55rem .75rem",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: Object.keys(flags).length ? 6 : 0 }}>
+                      {/* Protocol badge */}
+                      <span style={{
+                        fontSize: ".58rem", fontWeight: 700, padding: "2px 7px", borderRadius: 99,
+                        background: `${protoColor}18`, color: protoColor,
+                        border: `1px solid ${protoColor}30`,
+                        fontFamily: "JetBrains Mono, monospace",
+                      }}>
+                        {proto}
+                      </span>
+
+                      {/* Src → Dst */}
+                      <span className="font-monospace" style={{ fontSize: ".7rem", fontWeight: 600, color: "var(--nw-text)" }}>
+                        {flow.src}
+                      </span>
+                      <span style={{ color: "var(--nw-muted)", fontSize: ".7rem" }}>→</span>
+                      <span className="font-monospace" style={{ fontSize: ".7rem", fontWeight: 600, color: "var(--nw-text)" }}>
+                        {flow.dst}
+                      </span>
+
+                      {/* Packet count */}
+                      <span style={{ marginLeft: "auto", fontSize: ".68rem", color: "var(--nw-muted)" }}>
+                        пк: <span style={{ color: "var(--nw-text)", fontWeight: 600 }}>{flow.count}</span>
+                      </span>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </Card.Body>
-        </Card>
+
+                    {/* TCP flags */}
+                    {flow.protocol === 6 && Object.keys(flags).length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {Object.entries(flags).map(([flag, count]) => (
+                          <span
+                            key={flag}
+                            style={{
+                              fontSize: ".58rem", padding: "1px 6px", borderRadius: 5,
+                              background: "rgba(255,255,255,.04)",
+                              border: "1px solid var(--nw-border)",
+                              color: "var(--nw-muted)",
+                              fontFamily: "JetBrains Mono, monospace",
+                            }}
+                          >
+                            {parseFlagBits(flag)}:{" "}
+                            <span style={{ color: "var(--nw-text)" }}>{count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </Col>
     </Row>
   );

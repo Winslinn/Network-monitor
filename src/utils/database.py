@@ -1,9 +1,9 @@
 import sqlalchemy as sa
+import bcrypt
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker, DeclarativeBase, relationship
 from sqlalchemy.inspection import inspect
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
-import hashlib
 
 engine = sa.create_engine("sqlite:///network.db", echo=False)
 Session = sessionmaker(bind=engine)
@@ -13,10 +13,13 @@ class Base(DeclarativeBase):
         return {c.key: getattr(self, c.key) for c in inspect(self).mapper.column_attrs}
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 def verify_password(password: str, hashed: str) -> bool:
-    return hash_password(password) == hashed
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 role_user = sa.Table(
     "role_user",
@@ -99,6 +102,41 @@ class Rule(Base):
     description: Mapped[str] = mapped_column(default="")
     pattern: Mapped[str] = mapped_column()
     is_enabled: Mapped[bool] = mapped_column(default=True)
+
+class Flow(Base):
+    __tablename__ = "flows"
+    __table_args__ = (sa.UniqueConstraint('src_ip', 'dst_ip', 'protocol', name='_flow_uc'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    src_ip: Mapped[str] = mapped_column(index=True)
+    dst_ip: Mapped[str] = mapped_column(index=True)
+    protocol: Mapped[int] = mapped_column()
+    packet_count: Mapped[int] = mapped_column(default=0)
+    unique_ports: Mapped[int] = mapped_column(default=0)
+    start_time: Mapped[float] = mapped_column()
+    last_time: Mapped[float] = mapped_column()
+
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy import update
+
+def batch_update_flows(flows_data: List[Dict[str, Any]]):
+    if not flows_data:
+        return
+        
+    with Session() as session:
+        for data in flows_data:
+            stmt = insert(Flow).values(data)
+            
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['src_ip', 'dst_ip', 'protocol'],
+                set_={
+                    'packet_count': stmt.excluded.packet_count,
+                    'unique_ports': stmt.excluded.unique_ports,
+                    'last_time': stmt.excluded.last_time
+                }
+            )
+            session.execute(stmt)
+        session.commit()
+
 
 def init_db():
     Base.metadata.create_all(engine)

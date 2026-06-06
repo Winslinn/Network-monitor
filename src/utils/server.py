@@ -33,8 +33,8 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://potyshyi-server:3001", 
-        "http://potyshyi-server",
+        "https://potyshyi-server:3001", 
+        "https://potyshyi-server",
     ], 
     allow_credentials=True,
     allow_methods=["*"],
@@ -90,7 +90,7 @@ async def login(request: LoginRequest, response: Response):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
-    
+
     token = create_access_token(data={"sub": user["username"]})
     response.set_cookie(
         key="access_token", 
@@ -121,7 +121,7 @@ async def logout(response: Response):
     response.delete_cookie("access_token")
     return {"status": "ok"}
 
-@app.websocket("/ws")
+@app.websocket("/api/ws")
 async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] = Cookie(default=None)):
     if not access_token:
         await websocket.close(code=1008)
