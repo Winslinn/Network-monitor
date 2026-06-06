@@ -1,8 +1,9 @@
 import sqlalchemy as sa
+import bcrypt
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker, DeclarativeBase, relationship
 from sqlalchemy.inspection import inspect
 from typing import List, Optional, Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 
 engine = sa.create_engine("sqlite:///network.db", echo=False)
 Session = sessionmaker(bind=engine)
@@ -10,6 +11,29 @@ Session = sessionmaker(bind=engine)
 class Base(DeclarativeBase):
     def to_dict(self) -> Dict[str, Any]:
         return {c.key: getattr(self, c.key) for c in inspect(self).mapper.column_attrs}
+
+def hash_password(password: str) -> str:
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+role_user = sa.Table(
+    "role_user",
+    Base.metadata,
+    sa.Column("user_id", sa.Integer, sa.ForeignKey("users.id"), primary_key=True),
+    sa.Column("role_id", sa.Integer, sa.ForeignKey("roles.id"), primary_key=True),
+)
+
+permission_role = sa.Table(
+    "permission_role",
+    Base.metadata,
+    sa.Column("role_id", sa.Integer, sa.ForeignKey("roles.id"), primary_key=True),
+    sa.Column("permission_id", sa.Integer, sa.ForeignKey("permissions.id"), primary_key=True),
+)
 
 class Router(Base):
     __tablename__ = "router_info"
@@ -34,17 +58,32 @@ class Client(Base):
     router_id: Mapped[int] = mapped_column(sa.ForeignKey("router_info.id"))
     router: Mapped["Router"] = relationship(back_populates="clients")
 
+class Permission(Base):
+    __tablename__ = "permissions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    description: Mapped[Optional[str]] = mapped_column()
+
+class Role(Base):
+    __tablename__ = "roles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    
+    permissions: Mapped[List["Permission"]] = relationship(secondary=permission_role, backref="roles")
+
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
-    uuid: Mapped[str] = mapped_column(unique=True, index=True)
-    role: Mapped[str] = mapped_column(default="guest")
-    first_seen: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    username: Mapped[str] = mapped_column(unique=True, index=True)
+    pwrd: Mapped[str] = mapped_column()
+    first_seen: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    
+    roles: Mapped[List["Role"]] = relationship(secondary=role_user, backref="users")
 
 class Alert(Base):
     __tablename__ = "alerts"
     id: Mapped[int] = mapped_column(primary_key=True)
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     type: Mapped[str] = mapped_column()
     severity: Mapped[str] = mapped_column()
     src_ip: Mapped[Optional[str]] = mapped_column()
@@ -64,21 +103,140 @@ class Rule(Base):
     pattern: Mapped[str] = mapped_column()
     is_enabled: Mapped[bool] = mapped_column(default=True)
 
+class Flow(Base):
+    __tablename__ = "flows"
+    __table_args__ = (sa.UniqueConstraint('src_ip', 'dst_ip', 'protocol', name='_flow_uc'),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    src_ip: Mapped[str] = mapped_column(index=True)
+    dst_ip: Mapped[str] = mapped_column(index=True)
+    protocol: Mapped[int] = mapped_column()
+    packet_count: Mapped[int] = mapped_column(default=0)
+    unique_ports: Mapped[int] = mapped_column(default=0)
+    start_time: Mapped[float] = mapped_column()
+    last_time: Mapped[float] = mapped_column()
+
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy import update
+
+def batch_update_flows(flows_data: List[Dict[str, Any]]):
+    if not flows_data:
+        return
+        
+    with Session() as session:
+        for data in flows_data:
+            stmt = insert(Flow).values(data)
+            
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['src_ip', 'dst_ip', 'protocol'],
+                set_={
+                    'packet_count': stmt.excluded.packet_count,
+                    'unique_ports': stmt.excluded.unique_ports,
+                    'last_time': stmt.excluded.last_time
+                }
+            )
+            session.execute(stmt)
+        session.commit()
+
+
 def init_db():
     Base.metadata.create_all(engine)
-
-def get_user(user_id: str) -> Optional[Dict[str, Any]]:
     with Session() as session:
-        u = session.execute(sa.select(User).filter_by(uuid=user_id)).scalar_one_or_none()
-        return u.to_dict() if u else None
+        # Create default permissions
+        permissions_list = [
+            ("rules:view", "Permission to view rules"),
+            ("rules:edit", "Permission to add or delete rules"),
+            ("alerts:view", "Permission to view alerts history"),
+            ("dashboard:view", "Permission to view dashboard and clients"),
+        ]
+        
+        db_permissions = {}
+        for p_name, p_desc in permissions_list:
+            perm = session.execute(sa.select(Permission).filter_by(name=p_name)).scalar_one_or_none()
+            if not perm:
+                perm = Permission(name=p_name, description=p_desc)
+                session.add(perm)
+            db_permissions[p_name] = perm
+        
+        session.commit()
 
-def create_user(user_id: str, role: str = "guest") -> Dict[str, Any]:
+        # Ensure admin and analyst roles exist
+        admin_role = session.execute(sa.select(Role).filter_by(name="admin")).scalar_one_or_none()
+        if not admin_role:
+            admin_role = Role(name="admin")
+            session.add(admin_role)
+        
+        analyst_role = session.execute(sa.select(Role).filter_by(name="analyst")).scalar_one_or_none()
+        if not analyst_role:
+            analyst_role = Role(name="analyst")
+            session.add(analyst_role)
+        
+        session.commit()
+
+        # Assign permissions to roles
+        # Admin gets everything
+        for perm in db_permissions.values():
+            if perm not in admin_role.permissions:
+                admin_role.permissions.append(perm)
+        
+        # Analyst gets viewing permissions
+        for p_name in ["rules:view", "alerts:view", "dashboard:view"]:
+            if db_permissions[p_name] not in analyst_role.permissions:
+                analyst_role.permissions.append(db_permissions[p_name])
+        
+        session.commit()
+
+        user_count = session.query(sa.func.count(User.id)).scalar()
+        if user_count == 0:
+            import secrets
+            import string
+            
+            alphabet = string.ascii_letters + string.digits
+            password = ''.join(secrets.choice(alphabet) for i in range(12))
+            username = "admin"
+            
+            new_admin = User(username=username, pwrd=hash_password(password))
+            new_admin.roles.append(admin_role)
+            session.add(new_admin)
+            session.commit()
+            
+            print(" Use the following credentials to log in and change the password immediately: ")
+            print(f" Username: {username}")
+            print(f" Password: {password}")
+
+def get_user(username: str) -> Optional[Dict[str, Any]]:
     with Session() as session:
-        new_user = User(uuid=user_id, role=role)
+        u = session.execute(sa.select(User).options(
+            sa.orm.selectinload(User.roles).selectinload(Role.permissions)
+        ).filter_by(username=username)).scalar_one_or_none()
+        
+        if not u: return None
+        
+        res = u.to_dict()
+        res["roles"] = [r.name for r in u.roles]
+        
+        permissions = set()
+        for r in u.roles:
+            for p in r.permissions:
+                permissions.add(p.name)
+        res["permissions"] = list(permissions)
+        
+        return res
+
+def create_user(username: str, password: str, roles: List[str] = ["guest"]) -> Dict[str, Any]:
+    with Session() as session:
+        new_user = User(username=username, pwrd=hash_password(password))
+        for role_name in roles:
+            role = session.execute(sa.select(Role).filter_by(name=role_name)).scalar_one_or_none()
+            if not role:
+                role = Role(name=role_name)
+                session.add(role)
+            new_user.roles.append(role)
         session.add(new_user)
         session.commit()
         session.refresh(new_user)
-        return new_user.to_dict()
+        res = new_user.to_dict()
+        res["roles"] = [r.name for r in new_user.roles]
+        return res
     
 def add_client(mac: str, ip: str, hostname: Optional[str], status: str) -> tuple[Client, Dict[str, Any]]:
     with Session() as session:

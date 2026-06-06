@@ -1,109 +1,216 @@
-import React from 'react';
+import { Row, Col, Badge } from "react-bootstrap";
+import { Terminal as TerminalIcon, Activity, Trash2 } from "lucide-react";
 
-export default function Terminal({ 
-  logs, 
-  setLogs, 
-  packets, 
-  setPackets, 
-  sessionOrder, 
-  setSessionOrder, 
-  logsContainerRef 
-}) {
+const PANEL_STYLE = {
+  background: "var(--nw-surface)",
+  border: "1px solid var(--nw-border)",
+  borderRadius: 14,
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+};
 
-  const getFlagName = (flagValue) => {
-    const val = parseInt(flagValue, 10);
-    if (isNaN(val)) return flagValue;
-    const labels = [];
-    if (val & 0x01) labels.push('FIN');
-    if (val & 0x02) labels.push('SYN');
-    if (val & 0x04) labels.push('RST');
-    if (val & 0x08) labels.push('PSH');
-    if (val & 0x10) labels.push('ACK');
-    if (val & 0x20) labels.push('URG');
-    return labels.length > 0 ? labels.join('+') : `0x${val.toString(16).toUpperCase()}`;
-  };
+const HEADER_STYLE = {
+  display: "flex", alignItems: "center", justifyContent: "space-between",
+  padding: ".9rem 1.1rem",
+  borderBottom: "1px solid var(--nw-border)",
+  flexShrink: 0,
+};
 
+const LOG_PANE_STYLE = {
+  height: 340,
+  overflowY: "auto",
+  padding: ".75rem 1rem",
+  background: "var(--nw-inset)",
+  fontFamily: "JetBrains Mono, monospace",
+  fontSize: ".72rem",
+};
+
+function ClearBtn({ onClick, title }) {
   return (
-    <div className="terminal-container">
-      {/* СИСТЕМНІ ЛОГИ */}
-      <div className="terminal-card">
-        <div className="terminal-header">
-          <div className="terminal-title">System Logs & Alerts</div>
-          <button className="terminal-clear-btn" onClick={() => setLogs([])}>Clear</button>
-        </div>
-        <div className="terminal-content" ref={logsContainerRef}>
-          {logs.length === 0 ? (
-            <div className="terminal-empty">Логи та атаки не зафіксовані</div>
-          ) : (
-            logs.map((log, idx) => (
-              <div key={idx} className={`terminal-line ${log.type === 'alert' ? 'log-alert' : ''}`}>
-                <span className="terminal-time">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                <span className="terminal-log">{log.message}</span>
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: "none", border: "none", cursor: "pointer", padding: 5,
+        lineHeight: 0, borderRadius: 6,
+        color: "var(--nw-muted)", transition: "color .15s, background .15s",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.color = "var(--nw-danger)";
+        e.currentTarget.style.background = "rgba(244,63,94,.08)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.color = "var(--nw-muted)";
+        e.currentTarget.style.background = "none";
+      }}
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+function parseFlagBits(flagValue) {
+  const val = parseInt(flagValue, 10);
+  if (isNaN(val)) return String(flagValue);
+  const labels = [];
+  if (val & 0x01) labels.push("FIN");
+  if (val & 0x02) labels.push("SYN");
+  if (val & 0x04) labels.push("RST");
+  if (val & 0x08) labels.push("PSH");
+  if (val & 0x10) labels.push("ACK");
+  if (val & 0x20) labels.push("URG");
+  return labels.length ? labels.join("+") : `0x${val.toString(16).toUpperCase()}`;
+}
+
+export default function Terminal({
+  logs, setLogs,
+  packets, setPackets,
+  sessionOrder, setSessionOrder,
+  logsContainerRef,
+}) {
+  return (
+    <Row className="g-4">
+      {/* System logs */}
+      <Col lg={6}>
+        <div style={PANEL_STYLE}>
+          <div style={HEADER_STYLE}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TerminalIcon size={15} color="var(--nw-info)" />
+              <span style={{
+                fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: ".06em", color: "var(--nw-text)",
+              }}>
+                Системні логи
+              </span>
+            </div>
+            <ClearBtn onClick={() => setLogs([])} title="Очистити логи" />
+          </div>
+
+          <div style={LOG_PANE_STYLE} ref={logsContainerRef}>
+            {logs.length === 0 ? (
+              <div style={{ color: "var(--nw-muted)", textAlign: "center", padding: "3rem 0", opacity: .4 }}>
+                Логи відсутні
               </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* FLOWS */}
-      <div className="terminal-card">
-        <div className="terminal-header">
-          <div className="terminal-title">Network Flows Monitor</div>
-          <button className="terminal-clear-btn" onClick={() => { setPackets({}); setSessionOrder([]); }}>Clear</button>
-        </div>
-        <div className="terminal-content">
-          {sessionOrder.length === 0 ? (
-            <div className="terminal-empty">Мережева активність відсутня</div>
-          ) : (
-            sessionOrder.map((key) => {
-              const flow = packets[key];
-              if (!flow) return null;
-
-              const dports = flow.dports || {};
-              const flags  = flow.flags  || {};
-
-              const sortedPorts = Object.entries(dports)
-                .sort(([, a], [, b]) => b - a);
-
-              return (
-                <div key={key} className="connection-item">
-                  <div className="connection-header-row">
-                    <div className="connection-title">
-                      <span className={`protocol-badge ${flow.protocol === 6 ? 'proto-tcp' : 'proto-udp'}`}>
-                        {flow.protocol === 6 ? 'TCP' : flow.protocol === 17 ? 'UDP' : `IP-${flow.protocol}`}
-                      </span>
-                      <strong>{flow.src}</strong>
-                      <span className="arrow-divider"> → </span>
-                      <strong>{flow.dst}</strong>
-                    </div>
-                    <div className="connection-meta-right">
-                      Пакетів: <span className="highlight-text">{flow.count || 0}</span>
-                      {' · '}
-                      Портів: <span className={`highlight-text ${flow.unique_ports > 100 ? 'flag-anomaly' : ''}`}>
-                        {flow.unique_ports || 0}
-                      </span>
-                    </div>
-                  </div>
-
-                  {flow.protocol === 6 && Object.keys(flags).length > 0 && (
-                    <div className="connection-flags-container">
-                      <span className="flags-label">Flags:</span>
-                      {Object.entries(flags).map(([flag, count]) => {
-                        const isSynFloodRisk = parseInt(flag, 10) === 2 && count > 15;
-                        return (
-                          <span key={flag} className={`flag-counter-badge ${isSynFloodRisk ? 'flag-anomaly' : ''}`}>
-                            {getFlagName(flag)}: <span className="flag-count">{count}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
+            ) : (
+              logs.map((log) => (
+                <div
+                  key={log.id || log.timestamp}
+                  style={{
+                    display: "flex", gap: 12, marginBottom: 4,
+                    paddingBottom: 4,
+                    borderBottom: "1px solid rgba(255,255,255,.04)",
+                  }}
+                >
+                  <span style={{ color: "var(--nw-muted)", opacity: .5, minWidth: 72, flexShrink: 0 }}>
+                    [{new Date(log.timestamp).toLocaleTimeString("uk-UA")}]
+                  </span>
+                  <span style={{ color: log.type === "alert" ? "var(--nw-danger)" : "var(--nw-text)", fontWeight: log.type === "alert" ? 600 : 400 }}>
+                    {log.message}
+                  </span>
                 </div>
-              );
-            })
-          )}
+              ))
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      </Col>
+
+      {/* Network flows */}
+      <Col lg={6}>
+        <div style={PANEL_STYLE}>
+          <div style={HEADER_STYLE}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Activity size={15} color="var(--nw-success)" />
+              <span style={{
+                fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: ".06em", color: "var(--nw-text)",
+              }}>
+                Мережеві потоки
+              </span>
+            </div>
+            <ClearBtn onClick={() => { setPackets({}); setSessionOrder([]); }} title="Очистити потоки" />
+          </div>
+
+          <div style={{ ...LOG_PANE_STYLE, fontFamily: undefined }} ref={undefined}>
+            {sessionOrder.length === 0 ? (
+              <div style={{
+                color: "var(--nw-muted)", textAlign: "center",
+                padding: "3rem 0", opacity: .4,
+                fontFamily: "JetBrains Mono, monospace", fontSize: ".72rem",
+              }}>
+                Активність відсутня
+              </div>
+            ) : (
+              sessionOrder.map((key) => {
+                const flow = packets[key];
+                if (!flow) return null;
+                const flags = flow.flags || {};
+                const proto = flow.protocol === 6 ? "TCP" : flow.protocol === 17 ? "UDP" : `IP-${flow.protocol}`;
+                const protoColor = flow.protocol === 6 ? "var(--nw-accent)" : "var(--nw-info)";
+
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      background: "rgba(255,255,255,.025)",
+                      border: "1px solid var(--nw-border)",
+                      borderRadius: 7, padding: ".55rem .75rem",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: Object.keys(flags).length ? 6 : 0 }}>
+                      {/* Protocol badge */}
+                      <span style={{
+                        fontSize: ".58rem", fontWeight: 700, padding: "2px 7px", borderRadius: 99,
+                        background: `${protoColor}18`, color: protoColor,
+                        border: `1px solid ${protoColor}30`,
+                        fontFamily: "JetBrains Mono, monospace",
+                      }}>
+                        {proto}
+                      </span>
+
+                      {/* Src → Dst */}
+                      <span className="font-monospace" style={{ fontSize: ".7rem", fontWeight: 600, color: "var(--nw-text)" }}>
+                        {flow.src}
+                      </span>
+                      <span style={{ color: "var(--nw-muted)", fontSize: ".7rem" }}>→</span>
+                      <span className="font-monospace" style={{ fontSize: ".7rem", fontWeight: 600, color: "var(--nw-text)" }}>
+                        {flow.dst}
+                      </span>
+
+                      {/* Packet count */}
+                      <span style={{ marginLeft: "auto", fontSize: ".68rem", color: "var(--nw-muted)" }}>
+                        пк: <span style={{ color: "var(--nw-text)", fontWeight: 600 }}>{flow.count}</span>
+                      </span>
+                    </div>
+
+                    {/* TCP flags */}
+                    {flow.protocol === 6 && Object.keys(flags).length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {Object.entries(flags).map(([flag, count]) => (
+                          <span
+                            key={flag}
+                            style={{
+                              fontSize: ".58rem", padding: "1px 6px", borderRadius: 5,
+                              background: "rgba(255,255,255,.04)",
+                              border: "1px solid var(--nw-border)",
+                              color: "var(--nw-muted)",
+                              fontFamily: "JetBrains Mono, monospace",
+                            }}
+                          >
+                            {parseFlagBits(flag)}:{" "}
+                            <span style={{ color: "var(--nw-text)" }}>{count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </Col>
+    </Row>
   );
 }

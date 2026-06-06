@@ -1,19 +1,49 @@
-import socket, asyncio, json, re
+import socket, asyncio, json, re, time
 
 import utils.database as db
 
-from utils.database import Client
+from utils.database import Client, batch_update_flows
 from multiprocessing import Queue
 
 session_db = db.Session()
 
 async def watch_flows(flow_queue: Queue, manager):
     loop = asyncio.get_event_loop()
+    flow_buffer = {}
+    last_flush = time.time()
+    flush_interval = 5  # Flush every 5 seconds
     
     while True:
         try:
-            flow = await loop.run_in_executor(None, flow_queue.get)
-            await manager.broadcast({"context": "flows", "data": flow})
+            # Non-blocking get from queue with timeout
+            try:
+                # We use run_in_executor to not block the event loop
+                delta = await loop.run_in_executor(None, lambda: flow_queue.get(timeout=1))
+                await manager.broadcast({"context": "flows", "data": delta})
+                
+                # Update buffer with new flow data
+                for key, flow in delta.items():
+                    flow_buffer[key] = {
+                        'src_ip': flow['src'],
+                        'dst_ip': flow['dst'],
+                        'protocol': flow['protocol'],
+                        'packet_count': flow['packet_count'],
+                        'unique_ports': flow['unique_ports'],
+                        'start_time': flow['start_time'],
+                        'last_time': flow['last_time']
+                    }
+            except:
+                # Timeout reached, just check if we need to flush
+                pass
+
+            # Periodic flush to DB
+            if time.time() - last_flush >= flush_interval and flow_buffer:
+                flows_to_save = list(flow_buffer.values())
+                # Run DB update in executor to avoid blocking
+                await loop.run_in_executor(None, batch_update_flows, flows_to_save)
+                flow_buffer.clear()
+                last_flush = time.time()
+                
         except Exception as e:
             print(f"Error in watch_flows: {e}")
             await asyncio.sleep(1)
