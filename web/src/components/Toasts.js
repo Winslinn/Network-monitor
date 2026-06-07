@@ -22,41 +22,36 @@ export default function Toasts({ toasts }) {
           key={t.id}
           style={{
             background: "var(--nw-surface)",
-            border: `1px solid ${SEV_COLOR[t.severity] || "var(--nw-border)"}40`,
-            borderRadius: 12,
-            boxShadow: "0 8px 24px rgba(0,0,0,.4)",
+            border: `1px solid ${SEV_COLOR[t.severity] || "var(--nw-border)"}`,
+            borderRadius: "var(--nw-radius)",
+            boxShadow: "none",
             overflow: "hidden",
           }}
         >
-          {/* Severity accent line */}
-          <div style={{
-            height: 3,
-            background: SEV_COLOR[t.severity] || "var(--nw-border)",
-          }} />
-
           <Toast.Header
             closeVariant="white"
             style={{
-              background: "transparent",
+              background: "var(--nw-inset)",
               borderBottom: "1px solid var(--nw-border)",
               color: "var(--nw-text)",
+              padding: "0.5rem 0.75rem",
             }}
           >
-            <span style={{ marginRight: 8 }}>{SEV_ICON[t.severity] || "⚡"}</span>
+            <span style={{ marginRight: 8, fontSize: "0.8rem" }}>{SEV_ICON[t.severity] || "⚡"}</span>
             <strong style={{
               marginRight: "auto",
-              fontSize: ".72rem", fontWeight: 700,
-              textTransform: "uppercase", letterSpacing: ".05em",
+              fontSize: ".65rem", fontWeight: 800,
+              textTransform: "uppercase", letterSpacing: ".1em",
             }}>
-              Сповіщення
+              Event Log
             </strong>
-            <small style={{ color: "var(--nw-muted)", fontSize: ".68rem" }}>щойно</small>
+            <small style={{ color: "var(--nw-muted)", fontSize: ".6rem", fontWeight: 700, textTransform: "uppercase" }}>NOW</small>
           </Toast.Header>
 
           <Toast.Body style={{
-            color: "var(--nw-muted)", fontSize: ".8rem",
+            color: "var(--nw-text)", fontSize: ".72rem",
             fontFamily: "JetBrains Mono, monospace",
-            padding: ".65rem .9rem",
+            padding: ".6rem .75rem",
           }}>
             {t.message}
           </Toast.Body>

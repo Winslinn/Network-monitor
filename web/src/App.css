@@ -12,28 +12,30 @@ body {
 
 /* ── Sidebar nav ── */
 .nav-link {
-  border-radius: 8px !important;
-  transition: background .15s, color .15s !important;
+  border-radius: var(--nw-radius) !important;
   color: var(--nw-muted) !important;
-  font-weight: 600 !important;
-  font-size: .875rem !important;
-  padding: .55rem 1rem !important;
+  font-weight: 700 !important;
+  font-size: .8rem !important;
+  padding: .5rem .75rem !important;
+  letter-spacing: 0.02em;
 }
 .nav-link:hover {
-  background-color: rgba(255,255,255,.04) !important;
+  background-color: var(--nw-border) !important;
   color: var(--nw-text) !important;
 }
 .nav-link.active {
   background-color: var(--nw-accent-bg) !important;
   color: var(--nw-accent) !important;
-  box-shadow: inset 0 0 0 1px rgba(13,202,170,.2) !important;
+  box-shadow: none !important;
+  border: 1px solid var(--nw-accent) !important;
 }
 
 /* ── Cards ── */
 .card {
   background-color: var(--nw-surface) !important;
   border-color: var(--nw-border) !important;
-  border-radius: 12px !important;
+  border-radius: var(--nw-radius) !important;
+  box-shadow: none !important;
 }
 .card-header {
   background-color: transparent !important;
@@ -41,86 +43,78 @@ body {
 }
 
 /* ── Progress ── */
-.progress { border-radius: 6px !important; }
-.progress-bar { transition: transform .4s ease !important; }
+.progress { border-radius: 0 !important; border: 1px solid var(--nw-border); height: 8px !important; }
+.progress-bar { transition: none !important; }
 
-/* ── Alert rows (security events — no Bootstrap Alert component) ── */
+/* ── Alert rows ── */
 .nw-event {
   display: flex;
-  border-radius: 8px;
+  border-radius: var(--nw-radius);
   overflow: hidden;
   border: 1px solid;
-  transition: opacity .15s;
 }
-.nw-event:hover { opacity: .9; }
 .nw-event-icon {
-  width: 48px;
+  width: 40px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
-.nw-event-body { flex-grow: 1; padding: .65rem 1rem; }
+.nw-event-body { flex-grow: 1; padding: .5rem .85rem; }
 
 /* Severity variants */
 .nw-event.sev-critical {
-  border-color: rgba(244,63,94,.3);
+  border-color: var(--nw-danger);
   background: rgba(244,63,94,.05);
 }
-.nw-event.sev-critical .nw-event-icon { background: rgba(244,63,94,.12); }
+.nw-event.sev-critical .nw-event-icon { background: var(--nw-danger); color: #000; }
 
 .nw-event.sev-high {
-  border-color: rgba(244,63,94,.25);
-  background: rgba(244,63,94,.04);
+  border-color: var(--nw-danger);
+  background: rgba(244,63,94,0);
 }
-.nw-event.sev-high .nw-event-icon { background: rgba(244,63,94,.10); }
+.nw-event.sev-high .nw-event-icon { border-right: 1px solid var(--nw-danger); }
 
 .nw-event.sev-medium {
-  border-color: rgba(245,158,11,.25);
-  background: rgba(245,158,11,.04);
+  border-color: var(--nw-warning);
 }
-.nw-event.sev-medium .nw-event-icon { background: rgba(245,158,11,.10); }
+.nw-event.sev-medium .nw-event-icon { border-right: 1px solid var(--nw-warning); }
 
 .nw-event.sev-low {
-  border-color: rgba(56,189,248,.2);
-  background: rgba(56,189,248,.03);
+  border-color: var(--nw-border);
 }
-.nw-event.sev-low .nw-event-icon { background: rgba(56,189,248,.08); }
 
 /* ── Rule add form ── */
 .nw-form-panel {
   background: var(--nw-inset);
   border: 1px solid var(--nw-border);
-  border-radius: 10px;
-  padding: 1.25rem;
+  border-radius: var(--nw-radius);
+  padding: 1rem;
 }
 
 /* ── Dashboard icon badge ── */
 .nw-icon-badge {
-  width: 38px; height: 38px;
+  width: 32px; height: 32px;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: var(--nw-accent-bg);
-  border-radius: 10px;
+  background: var(--nw-inset);
+  border: 1px solid var(--nw-border);
+  border-radius: var(--nw-radius);
   color: var(--nw-accent);
 }
 
-/* ── Tab animation ── */
-.tab-content { animation: fadeUp .18s ease; }
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* ── Tab animation — REMOVED for technical feel ── */
+.tab-content { animation: none; }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--nw-border); border-radius: 10px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--nw-bg); }
+::-webkit-scrollbar-thumb { background: var(--nw-border); }
 ::-webkit-scrollbar-thumb:hover { background: var(--nw-muted); }
 
 /* ── Table ── */
-.table > :not(caption) > * > * { border-bottom-width: 1px !important; }
+.table > :not(caption) > * > * { border-bottom-width: 1px !important; padding: .65rem 1rem !important; }
 
 /* ── Alert Banner (connection state) ── */
-.alert { border-radius: 10px !important; }
+.alert { border-radius: var(--nw-radius) !important; }

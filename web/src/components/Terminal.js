@@ -4,7 +4,7 @@ import { Terminal as TerminalIcon, Activity, Trash2 } from "lucide-react";
 const PANEL_STYLE = {
   background: "var(--nw-surface)",
   border: "1px solid var(--nw-border)",
-  borderRadius: 14,
+  borderRadius: "var(--nw-radius)",
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
@@ -12,15 +12,16 @@ const PANEL_STYLE = {
 
 const HEADER_STYLE = {
   display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: ".9rem 1.1rem",
+  padding: "0.75rem 1rem",
   borderBottom: "1px solid var(--nw-border)",
+  background: "var(--nw-inset)",
   flexShrink: 0,
 };
 
 const LOG_PANE_STYLE = {
   height: 340,
   overflowY: "auto",
-  padding: ".75rem 1rem",
+  padding: "0.75rem",
   background: "var(--nw-inset)",
   fontFamily: "JetBrains Mono, monospace",
   fontSize: ".72rem",
@@ -33,17 +34,11 @@ function ClearBtn({ onClick, title }) {
       title={title}
       style={{
         background: "none", border: "none", cursor: "pointer", padding: 5,
-        lineHeight: 0, borderRadius: 6,
-        color: "var(--nw-muted)", transition: "color .15s, background .15s",
+        lineHeight: 0,
+        color: "var(--nw-muted)",
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.color = "var(--nw-danger)";
-        e.currentTarget.style.background = "rgba(244,63,94,.08)";
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.color = "var(--nw-muted)";
-        e.currentTarget.style.background = "none";
-      }}
+      onMouseEnter={e => e.currentTarget.style.color = "var(--nw-danger)"}
+      onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
     >
       <Trash2 size={14} />
     </button>
@@ -180,13 +175,13 @@ export default function Terminal({
 
                       {/* Packet count */}
                       <span style={{ marginLeft: "auto", fontSize: ".68rem", color: "var(--nw-muted)" }}>
-                        пк: <span style={{ color: "var(--nw-text)", fontWeight: 600 }}>{flow.count}</span>
+                        Кількість пакетів: <span style={{ color: "var(--nw-text)", fontWeight: 600 }}>{flow.count}</span>
                       </span>
                     </div>
 
                     {/* TCP flags */}
                     {flow.protocol === 6 && Object.keys(flags).length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
                         {Object.entries(flags).map(([flag, count]) => (
                           <span
                             key={flag}
@@ -202,6 +197,36 @@ export default function Terminal({
                             <span style={{ color: "var(--nw-text)" }}>{count}</span>
                           </span>
                         ))}
+                      </div>
+                    )}
+
+                    {flow.ports && Object.keys(flow.ports).length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        <span style={{ fontSize: ".58rem", color: "var(--nw-muted)", marginRight: 2, alignSelf: "center" }}>
+                          Порти:
+                        </span>
+                        {Object.entries(flow.ports)
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 5)
+                          .map(([port]) => (
+                            <span
+                              key={port}
+                              style={{
+                                fontSize: ".58rem", padding: "1px 6px", borderRadius: 5,
+                                background: "var(--nw-accent)10",
+                                border: "1px solid var(--nw-accent)30",
+                                color: "var(--nw-accent)",
+                                fontFamily: "JetBrains Mono, monospace",
+                              }}
+                            >
+                              {port}
+                            </span>
+                          ))}
+                        {Object.keys(flow.ports).length > 5 && (
+                          <span style={{ fontSize: ".58rem", color: "var(--nw-muted)", alignSelf: "center" }}>
+                            +{Object.keys(flow.ports).length - 5} ще
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

@@ -126,7 +126,7 @@ def packet_collector(result_queue: Queue, flow_queue: Queue):
                     'dst':          v['dst'],
                     'protocol':     v['protocol'],
                     'packet_count': v['packet_count'],
-                    'unique_ports': len(v['dports']),
+                    'ports':        v['dports'],
                     'flags':        dict(v['flags']),
                     'start_time':   v['start_time'],
                     'last_time':    v['last_time']
