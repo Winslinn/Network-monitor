@@ -20,7 +20,7 @@ body {
   letter-spacing: 0.02em;
 }
 .nav-link:hover {
-  background-color: var(--nw-border) !important;
+  background-color: var(--nw-inset) !important;
   color: var(--nw-text) !important;
 }
 .nav-link.active {
@@ -35,7 +35,7 @@ body {
   background-color: var(--nw-surface) !important;
   border-color: var(--nw-border) !important;
   border-radius: var(--nw-radius) !important;
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
 }
 .card-header {
   background-color: transparent !important;
@@ -66,23 +66,25 @@ body {
 /* Severity variants */
 .nw-event.sev-critical {
   border-color: var(--nw-danger);
-  background: rgba(244,63,94,.05);
+  background: rgba(239, 68, 68, .05);
 }
-.nw-event.sev-critical .nw-event-icon { background: var(--nw-danger); color: #000; }
+.nw-event.sev-critical .nw-event-icon { background: var(--nw-danger); color: #fff; }
 
 .nw-event.sev-high {
   border-color: var(--nw-danger);
-  background: rgba(244,63,94,0);
+  background: rgba(239, 68, 68, 0.02);
 }
 .nw-event.sev-high .nw-event-icon { border-right: 1px solid var(--nw-danger); }
 
 .nw-event.sev-medium {
   border-color: var(--nw-warning);
+  background: rgba(245, 158, 11, 0.02);
 }
 .nw-event.sev-medium .nw-event-icon { border-right: 1px solid var(--nw-warning); }
 
 .nw-event.sev-low {
   border-color: var(--nw-border);
+  background: var(--nw-inset);
 }
 
 /* ── Rule add form ── */
@@ -110,8 +112,8 @@ body {
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--nw-bg); }
-::-webkit-scrollbar-thumb { background: var(--nw-border); }
-::-webkit-scrollbar-thumb:hover { background: var(--nw-muted); }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 /* ── Table ── */
 .table > :not(caption) > * > * { border-bottom-width: 1px !important; padding: .65rem 1rem !important; }

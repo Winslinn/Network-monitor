@@ -236,7 +236,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                     display: "flex", alignItems: "center", gap: 14,
                     padding: ".65rem 1rem",
                     borderBottom: idx < rules.length - 1 ? "1px solid var(--nw-border)" : "none",
-                    background: rule.is_enabled ? "transparent" : "rgba(255,255,255,0.02)",
+                    background: rule.is_enabled ? "transparent" : "rgba(0,0,0,0.02)",
                   }}
                 >
                   {/* Enable toggle */}
@@ -260,7 +260,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                       {rule.name}
                     </div>
                     <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", marginTop: 2 }}>
-                      {RULE_TYPES[rule.type] || rule.type} | ID: {rule.id?.slice(0, 8)}
+                      {RULE_TYPES[rule.type] || rule.type} | ID: {String(rule.id).slice(0, 8)}
                     </div>
                   </div>
 

@@ -134,6 +134,7 @@ function MainLayout({ setIsAuth }) {
       Object.entries(delta).forEach(([k, flow]) => {
         const isNew = !packetsRef.current[k];
         packetsRef.current[k] = {
+          flow_id: flow.flow_id,
           src: flow.src, dst: flow.dst, protocol: flow.protocol,
           ports: flow.ports, flags: flow.flags,
           count: flow.packet_count,
@@ -145,16 +146,28 @@ function MainLayout({ setIsAuth }) {
       if (newKeys.length) setSessionOrder(prev => [...newKeys, ...prev]);
     }
     else if (ctx === "alert")  {
-      setAlerts(prev => [{
-        ...msg.data,
-        _id: Date.now() + Math.random(),
-        _received: Date.now(),
-      }, ...prev].slice(0, 200));
-      setUnreadAlerts(v => v + 1);
-      addToast(
-        `${TYPE_LABELS[msg.data.type] || msg.data.type}: ${msg.data.description?.slice(0, 60)}`,
-        msg.data.severity,
-      );
+      setAlerts(prev => {
+        const data = msg.data || {};
+        const exists = prev.find(a => a.id === data.id);
+        
+        if (exists) {
+          // Оновлюємо існуючу подію
+          return prev.map(a => a.id === data.id ? { ...data, _received: Date.now() } : a);
+        } else {
+          // Це нова подія
+          setUnreadAlerts(v => v + 1);
+          addToast(
+            `${TYPE_LABELS[data.type] || data.type}: ${data.description?.slice(0, 60)}`,
+            data.severity,
+          );
+          
+          return [{
+            ...data,
+            _id: Date.now() + Math.random(),
+            _received: Date.now(),
+          }, ...prev].slice(0, 200);
+        }
+      });
     }
     else if (ctx === "rules_list") setRules(msg.data || []);
     else if (ctx === "rule_added" && msg.rule) {

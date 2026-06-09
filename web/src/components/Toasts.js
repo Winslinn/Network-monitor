@@ -1,10 +1,11 @@
 import { ToastContainer, Toast } from "react-bootstrap";
+import { Info, TriangleAlert, CircleStop, Siren, Zap } from "lucide-react";
 
 export const SEV_ICON = {
-  low:      "ℹ️",
-  medium:   "⚠️",
-  high:     "🔴",
-  critical: "🚨",
+  low:      <Info size={16} className="text-info" />,
+  medium:   <TriangleAlert size={16} className="text-warning" />,
+  high:     <CircleStop size={16} className="text-danger" />,
+  critical: <Siren size={16} className="text-danger" />,
 };
 
 const SEV_COLOR = {
@@ -37,7 +38,10 @@ export default function Toasts({ toasts }) {
               padding: "0.5rem 0.75rem",
             }}
           >
-            <span style={{ marginRight: 8, fontSize: "0.8rem" }}>{SEV_ICON[t.severity] || "⚡"}</span>
+            {/* Рендеримо іконку як React-компонент */}
+            <span style={{ marginRight: 8, display: "inline-flex", alignItems: "center" }}>
+              {SEV_ICON[t.severity] || <Zap size={16} />}
+            </span>
             <strong style={{
               marginRight: "auto",
               fontSize: ".65rem", fontWeight: 800,

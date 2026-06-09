@@ -107,9 +107,16 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                   {/* Body */}
                   <div className="nw-event-body">
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontSize: ".8rem", fontWeight: 800, color: "var(--nw-text)" }}>
-                        {TYPE_LABELS[a.type] || a.type}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: ".8rem", fontWeight: 800, color: "var(--nw-text)" }}>
+                          {TYPE_LABELS[a.type] || a.type}
+                        </span>
+                        {a.count > 1 && (
+                          <Badge bg="danger" style={{ fontSize: ".6rem", borderRadius: 4, padding: "2px 5px" }}>
+                            x{a.count}
+                          </Badge>
+                        )}
+                      </div>
                       <span style={{
                         fontSize: ".6rem", fontWeight: 800, textTransform: "uppercase",
                         letterSpacing: ".05em", color: cfg.color,
@@ -122,8 +129,24 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                     <p style={{ margin: "2px 0 4px", fontSize: ".75rem", color: "var(--nw-muted)", fontWeight: 600 }}>
                       {a.description}
                     </p>
-                    <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", opacity: .6 }}>
-                      {fmtDate(a.timestamp * 1000)}
+                    <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", opacity: .6, display: "flex", gap: 12 }}>
+                      <span>{fmtDate(a.last_seen || a.timestamp)}</span>
+                      {a.flow_id && (
+                        <span 
+                          title="Натисніть, щоб скопіювати HASH"
+                          onClick={() => {
+                            navigator.clipboard.writeText(a.flow_id);
+                          }}
+                          style={{ 
+                            cursor: "pointer", userSelect: "none", 
+                            color: "var(--nw-muted)" 
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.color = "var(--nw-accent)"}
+                          onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
+                        >
+                          ID: {a.flow_id}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
