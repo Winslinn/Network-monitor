@@ -105,9 +105,6 @@ function MainLayout({ setIsAuth }) {
         hostname:      r.device_name     || prev.hostname,
         ip:            r.ip_address      || "—",
         mac:           r.mac_address     || "—",
-        dns:           Array.isArray(r.dns_server)
-                         ? r.dns_server.join(", ")
-                         : (r.dns_server || "—"),
         cpuUsage:      r.cpuUsage        ?? prev.cpuUsage,
         ramUsage:      r.ramUsage        ?? prev.ramUsage,
         downloadSpeed: r.downloadSpeed   || prev.downloadSpeed,
@@ -137,8 +134,9 @@ function MainLayout({ setIsAuth }) {
       Object.entries(delta).forEach(([k, flow]) => {
         const isNew = !packetsRef.current[k];
         packetsRef.current[k] = {
+          flow_id: flow.flow_id,
           src: flow.src, dst: flow.dst, protocol: flow.protocol,
-          unique_ports: flow.unique_ports, flags: flow.flags,
+          ports: flow.ports, flags: flow.flags,
           count: flow.packet_count,
           uniqueId: packetsRef.current[k]?.uniqueId || Math.random().toString(36).slice(2),
         };
@@ -148,16 +146,28 @@ function MainLayout({ setIsAuth }) {
       if (newKeys.length) setSessionOrder(prev => [...newKeys, ...prev]);
     }
     else if (ctx === "alert")  {
-      setAlerts(prev => [{
-        ...msg.data,
-        _id: Date.now() + Math.random(),
-        _received: Date.now(),
-      }, ...prev].slice(0, 200));
-      setUnreadAlerts(v => v + 1);
-      addToast(
-        `${TYPE_LABELS[msg.data.type] || msg.data.type}: ${msg.data.description?.slice(0, 60)}`,
-        msg.data.severity,
-      );
+      setAlerts(prev => {
+        const data = msg.data || {};
+        const exists = prev.find(a => a.id === data.id);
+        
+        if (exists) {
+          // Оновлюємо існуючу подію
+          return prev.map(a => a.id === data.id ? { ...data, _received: Date.now() } : a);
+        } else {
+          // Це нова подія
+          setUnreadAlerts(v => v + 1);
+          addToast(
+            `${TYPE_LABELS[data.type] || data.type}: ${data.description?.slice(0, 60)}`,
+            data.severity,
+          );
+          
+          return [{
+            ...data,
+            _id: Date.now() + Math.random(),
+            _received: Date.now(),
+          }, ...prev].slice(0, 200);
+        }
+      });
     }
     else if (ctx === "rules_list") setRules(msg.data || []);
     else if (ctx === "rule_added" && msg.rule) {
@@ -240,24 +250,22 @@ function MainLayout({ setIsAuth }) {
         background: "var(--nw-surface)",
         borderBottom: "1px solid var(--nw-border)",
         display: "flex", alignItems: "center",
-        padding: ".65rem 1.25rem", gap: "1rem", height: 57,
+        padding: "0 1.25rem", gap: "1rem", height: 48,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: ".95rem" }}>
-          <Shield size={19} color="var(--nw-accent)" />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 900, fontSize: ".85rem", letterSpacing: "0.02em" }}>
+          <Shield size={16} color="var(--nw-accent)" />
           <span style={{ color: "var(--nw-text)" }}>NetWatch</span>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
           {/* WS badge */}
           <span style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "4px 12px", borderRadius: 99,
-            fontSize: ".68rem", fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase",
-            background: wsStatus === "ok"
-              ? "rgba(34,197,94,.12)"
-              : wsStatus === "reconnecting"
-                ? "rgba(245,158,11,.12)"
-                : "rgba(244,63,94,.12)",
+            padding: "3px 12px",
+            fontSize: ".65rem", fontWeight: 700, letterSpacing: ".02em",
+            background: "var(--nw-inset)",
+            border: "1px solid var(--nw-border)",
+            borderRadius: 99,
             color: wsStatus === "ok"
               ? "var(--nw-success)"
               : wsStatus === "reconnecting"
@@ -275,11 +283,10 @@ function MainLayout({ setIsAuth }) {
           {/* Uptime */}
           {routerInfo.uptime && (
             <span className="font-monospace" style={{
-              fontSize: ".72rem", color: "var(--nw-muted)",
-              background: "var(--nw-inset)", border: "1px solid var(--nw-border)",
-              borderRadius: 99, padding: "4px 12px",
+              fontSize: ".65rem", color: "var(--nw-muted)",
+              fontWeight: 600,
             }}>
-              {routerInfo.uptime}
+              UPTIME: {routerInfo.uptime}
             </span>
           )}
 
@@ -287,15 +294,14 @@ function MainLayout({ setIsAuth }) {
           <button
             onClick={handleLogout}
             style={{
-              background: "none", border: "none", cursor: "pointer", padding: 6,
-              color: "var(--nw-muted)", borderRadius: 8, lineHeight: 0,
-              transition: "color .15s",
+              background: "none", border: "none", cursor: "pointer", padding: 4,
+              color: "var(--nw-muted)", lineHeight: 0,
             }}
             title="Вийти"
-            onMouseEnter={e => e.currentTarget.style.color = "var(--nw-text)"}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--nw-danger)"}
             onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
           >
-            <LogOut size={17} />
+            <LogOut size={14} />
           </button>
         </div>
       </nav>
@@ -305,30 +311,30 @@ function MainLayout({ setIsAuth }) {
         <aside
           className="flex-column"
           style={{
-            width: 220, flexShrink: 0,
-            background: "var(--nw-surface)",
+            width: 200, flexShrink: 0,
+            background: "var(--nw-inset)",
             borderRight: "1px solid var(--nw-border)",
-            position: "sticky", top: 57,
-            height: "calc(100vh - 57px)",
-            padding: "1rem .75rem",
+            position: "sticky", top: 48,
+            height: "calc(100vh - 48px)",
+            padding: "1rem 0.5rem",
             overflowY: "auto",
             display: "flex",
           }}
         >
           <Nav variant="pills" className="flex-column gap-1">
-            <NavItem id="dashboard" icon={<LayoutDashboard size={16} />} label="Дашборд" />
-            <NavItem id="alerts"    icon={<Bell size={16} />}            label="Події" badge={unreadAlerts} />
-            <NavItem id="rules"     icon={<Shield size={16} />}          label="Правила" />
+            <NavItem id="dashboard" icon={<LayoutDashboard size={14} />} label="Дашборд" />
+            <NavItem id="alerts"    icon={<Bell size={14} />}            label="Події" badge={unreadAlerts} />
+            <NavItem id="rules"     icon={<Shield size={14} />}          label="Правила" />
           </Nav>
         </aside>
 
         {/* Content */}
-        <main style={{ flex: 1, padding: "1.75rem", minWidth: 0, paddingBottom: "5rem" }}>
-          <header style={{ marginBottom: "1.5rem" }}>
-            <h2 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, letterSpacing: "-.02em" }}>
+        <main style={{ flex: 1, padding: "1.5rem", minWidth: 0 }}>
+          <header style={{ marginBottom: "1.25rem", borderBottom: "1px solid var(--nw-border)", paddingBottom: "1rem" }}>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em", textTransform: "uppercase" }}>
               {PAGE[tab].title}
             </h2>
-            <p style={{ margin: "3px 0 0", fontSize: ".8rem", color: "var(--nw-muted)" }}>
+            <p style={{ margin: "2px 0 0", fontSize: ".7rem", color: "var(--nw-muted)", textTransform: "uppercase", fontWeight: 600 }}>
               {PAGE[tab].sub}
             </p>
           </header>
@@ -337,22 +343,22 @@ function MainLayout({ setIsAuth }) {
           {wsStatus !== "ok" && (
             <div style={{
               display: "flex", alignItems: "center", gap: 10,
-              padding: ".65rem 1rem", borderRadius: 10, marginBottom: "1.25rem",
-              background: wsStatus === "reconnecting" ? "rgba(245,158,11,.07)" : "rgba(244,63,94,.07)",
-              border: `1px solid ${wsStatus === "reconnecting" ? "rgba(245,158,11,.25)" : "rgba(244,63,94,.25)"}`,
+              padding: ".5rem 0.75rem", marginBottom: "1rem",
+              background: "rgba(244,63,94,0.05)",
+              border: `1px solid var(--nw-danger)`,
             }}>
               <Spinner
                 animation="border" size="sm"
                 style={{
-                  width: 14, height: 14, borderWidth: 2,
-                  color: wsStatus === "reconnecting" ? "var(--nw-warning)" : "var(--nw-danger)",
+                  width: 12, height: 12, borderWidth: 2,
+                  color: "var(--nw-danger)",
                 }}
               />
               <span style={{
-                fontSize: ".82rem", fontWeight: 600,
-                color: wsStatus === "reconnecting" ? "var(--nw-warning)" : "var(--nw-danger)",
+                fontSize: ".7rem", fontWeight: 800, textTransform: "uppercase",
+                color: "var(--nw-danger)",
               }}>
-                {wsStatus === "reconnecting" ? "Перепідключення до сервера…" : "Підключення…"}
+                {wsStatus === "reconnecting" ? "Перепідключення до сервера…" : "Втрачено зв'язок з сервером"}
               </span>
             </div>
           )}

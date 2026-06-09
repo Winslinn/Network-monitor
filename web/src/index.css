@@ -1,34 +1,37 @@
-/* ── NetWatch Design Tokens ── */
+/* ── NetWatch Design Tokens — Engineering Style ── */
 :root {
-  --nw-bg:         #05080e;
-  --nw-surface:    #0b1018;
-  --nw-inset:      #040710;
-  --nw-border:     #162030;
-  --nw-text:       #cfd9ea;
-  --nw-muted:      #4e6580;
-  --nw-accent:     #0dcaaa;
-  --nw-accent-bg:  rgba(13, 202, 170, .10);
-  --nw-accent-dim: rgba(13, 202, 170, .06);
-  --nw-success:    #22c55e;
+  --nw-bg:         #f1f5f9;
+  --nw-surface:    #ffffff;
+  --nw-inset:      #f8fafc;
+  --nw-border:     #e2e8f0;
+  --nw-text:       #0f172a;
+  --nw-muted:      #64748b;
+  --nw-accent:     #059669;
+  --nw-accent-bg:  rgba(5, 150, 105, .10);
+  --nw-accent-dim: rgba(5, 150, 105, .06);
+  --nw-success:    #10b981;
   --nw-warning:    #f59e0b;
-  --nw-danger:     #f43f5e;
-  --nw-info:       #38bdf8;
-  --nw-purple:     #a78bfa;
+  --nw-danger:     #ef4444;
+  --nw-info:       #0ea5e9;
+  --nw-purple:     #8b5cf6;
 
   /* Bootstrap overrides */
   --bs-body-bg:        var(--nw-bg);
   --bs-body-color:     var(--nw-text);
   --bs-border-color:   var(--nw-border);
-  --bs-dark-rgb:       11, 16, 24;
-  --bs-black-rgb:      4, 7, 16;
-  --bs-primary-rgb:    13, 202, 170;
-  --bs-success-rgb:    34, 197, 94;
+  --bs-dark-rgb:       255, 255, 255;
+  --bs-black-rgb:      0, 0, 0;
+  --bs-primary-rgb:    5, 150, 105;
+  --bs-success-rgb:    16, 185, 129;
   --bs-warning-rgb:    245, 158, 11;
-  --bs-danger-rgb:     244, 63, 94;
-  --bs-info-rgb:       56, 189, 248;
+  --bs-danger-rgb:     239, 68, 68;
+  --bs-info-rgb:       14, 165, 233;
   --bs-secondary-color: var(--nw-muted);
   --bs-link-color:     var(--nw-accent);
   --bs-link-hover-color: var(--nw-accent);
+
+  /* Global UI simplification */
+  --nw-radius: 4px;
 }
 
 body {
@@ -56,19 +59,25 @@ body {
 .border-secondary { border-color: var(--nw-border) !important; }
 
 /* Buttons */
+.btn {
+  border-radius: var(--nw-radius) !important;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
 .btn-primary {
   --bs-btn-bg: var(--nw-accent);
   --bs-btn-border-color: var(--nw-accent);
-  --bs-btn-hover-bg: #0aaa8e;
-  --bs-btn-hover-border-color: #0aaa8e;
-  --bs-btn-active-bg: #0aaa8e;
-  --bs-btn-color: #000;
-  --bs-btn-hover-color: #000;
+  --bs-btn-hover-bg: #047857;
+  --bs-btn-hover-border-color: #047857;
+  --bs-btn-active-bg: #047857;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
 }
 .btn-outline-secondary {
   --bs-btn-color: var(--nw-muted);
   --bs-btn-border-color: var(--nw-border);
-  --bs-btn-hover-bg: rgba(255,255,255,.04);
+  --bs-btn-hover-bg: rgba(0,0,0,0.05);
   --bs-btn-hover-color: var(--nw-text);
   --bs-btn-hover-border-color: var(--nw-muted);
 }
@@ -79,25 +88,27 @@ body {
 
 /* Forms */
 .form-control, .form-select {
-  background-color: var(--nw-inset) !important;
+  background-color: var(--nw-surface) !important;
   border-color: var(--nw-border) !important;
   color: var(--nw-text) !important;
+  border-radius: var(--nw-radius) !important;
 }
 .form-control:focus, .form-select:focus {
   border-color: var(--nw-accent) !important;
-  box-shadow: 0 0 0 .2rem var(--nw-accent-bg) !important;
+  box-shadow: none !important; /* No glow */
 }
 .form-control::placeholder { color: var(--nw-muted) !important; opacity: .5; }
 .form-select option { background-color: var(--nw-surface); }
 
 .input-group-text {
-  background-color: var(--nw-inset) !important;
+  background-color: var(--nw-surface) !important;
   border-color: var(--nw-border) !important;
   color: var(--nw-muted) !important;
+  border-radius: var(--nw-radius) !important;
 }
 
 /* Progress */
-.progress { background-color: var(--nw-inset) !important; }
+.progress { background-color: var(--nw-inset) !important; border-radius: 0 !important; }
 
 /* Table */
 .table-dark {
@@ -108,8 +119,8 @@ body {
 }
 
 /* Toasts */
-.toast          { border-color: var(--nw-border) !important; }
-.toast-header   { border-bottom-color: var(--nw-border) !important; }
+.toast          { border-color: var(--nw-border) !important; border-radius: var(--nw-radius) !important; background-color: var(--nw-surface) !important; }
+.toast-header   { border-bottom-color: var(--nw-border) !important; background-color: transparent !important; color: var(--nw-text) !important; }
 
 code {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;

@@ -79,13 +79,14 @@ def get_current_user_from_token(token: str):
         if username is None:
             return None
         return db.get_user(username)
+    
     except jwt.PyJWTError:
         return None
 
 @app.post("/api/login")
 async def login(request: LoginRequest, response: Response):
     user = db.get_user(request.username)
-    if not user or not db.verify_password(request.password, user["pwrd"]):
+    if not user or not db.verify_password(request.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
@@ -96,6 +97,7 @@ async def login(request: LoginRequest, response: Response):
         key="access_token", 
         value=token, 
         httponly=True, 
+        secure=True,
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
@@ -195,7 +197,7 @@ async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] =
 def run_websocket(log_queue, flow_queue, result_queue):
     init_db()
     async def serve():
-        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None)
+        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None, workers=4)
         server = uvicorn.Server(config)
         
         await asyncio.gather(

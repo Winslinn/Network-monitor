@@ -1,10 +1,11 @@
-import { Row, Col, Badge } from "react-bootstrap";
-import { Terminal as TerminalIcon, Activity, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Row, Col } from "react-bootstrap";
+import { Terminal as TerminalIcon, Activity, Trash2, Search } from "lucide-react";
 
 const PANEL_STYLE = {
   background: "var(--nw-surface)",
   border: "1px solid var(--nw-border)",
-  borderRadius: 14,
+  borderRadius: "var(--nw-radius)",
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
@@ -12,18 +13,19 @@ const PANEL_STYLE = {
 
 const HEADER_STYLE = {
   display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: ".9rem 1.1rem",
+  padding: "0.75rem 1rem",
   borderBottom: "1px solid var(--nw-border)",
+  background: "var(--nw-inset)",
   flexShrink: 0,
 };
 
 const LOG_PANE_STYLE = {
   height: 340,
   overflowY: "auto",
-  padding: ".75rem 1rem",
+  padding: "0.75rem",
   background: "var(--nw-inset)",
   fontFamily: "JetBrains Mono, monospace",
-  fontSize: ".72rem",
+  fontSize: ".8rem",
 };
 
 function ClearBtn({ onClick, title }) {
@@ -33,17 +35,11 @@ function ClearBtn({ onClick, title }) {
       title={title}
       style={{
         background: "none", border: "none", cursor: "pointer", padding: 5,
-        lineHeight: 0, borderRadius: 6,
-        color: "var(--nw-muted)", transition: "color .15s, background .15s",
+        lineHeight: 0,
+        color: "var(--nw-muted)",
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.color = "var(--nw-danger)";
-        e.currentTarget.style.background = "rgba(244,63,94,.08)";
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.color = "var(--nw-muted)";
-        e.currentTarget.style.background = "none";
-      }}
+      onMouseEnter={e => e.currentTarget.style.color = "var(--nw-danger)"}
+      onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
     >
       <Trash2 size={14} />
     </button>
@@ -69,6 +65,31 @@ export default function Terminal({
   sessionOrder, setSessionOrder,
   logsContainerRef,
 }) {
+  const [logFilter, setLogFilter] = useState("");
+  const [flowFilter, setFlowFilter] = useState("");
+
+  const filteredLogs = useMemo(() => {
+    if (!logFilter.trim()) return logs;
+    const q = logFilter.toLowerCase();
+    return logs.filter(log => log.message?.toLowerCase().includes(q));
+  }, [logFilter, logs]);
+
+  const filteredOrder = useMemo(() => {
+    if (!flowFilter.trim()) return sessionOrder;
+    const q = flowFilter.toLowerCase();
+    return sessionOrder.filter(key => {
+      const f = packets[key];
+      if (!f) return false;
+      const proto = f.protocol === 6 ? "tcp" : f.protocol === 17 ? "udp" : `ip-${f.protocol}`;
+      return (
+        f.src.toLowerCase().includes(q) ||
+        f.dst.toLowerCase().includes(q) ||
+        (f.flow_id && f.flow_id.toLowerCase().includes(q)) ||
+        proto.includes(q)
+      );
+    });
+  }, [flowFilter, sessionOrder, packets]);
+
   return (
     <Row className="g-4">
       {/* System logs */}
@@ -84,22 +105,44 @@ export default function Terminal({
                 Системні логи
               </span>
             </div>
-            <ClearBtn onClick={() => setLogs([])} title="Очистити логи" />
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ position: "relative", width: 160 }}>
+                <Search size={12} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--nw-muted)" }} />
+                <input
+                  type="text"
+                  placeholder="Пошук..."
+                  value={logFilter}
+                  onChange={e => setLogFilter(e.target.value)}
+                  style={{
+                    width: "100%",
+                    background: "var(--nw-surface)",
+                    border: "1px solid var(--nw-border)",
+                    borderRadius: 6,
+                    padding: "2px 8px 2px 26px",
+                    fontSize: ".68rem",
+                    color: "var(--nw-text)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <ClearBtn onClick={() => setLogs([])} title="Очистити логи" />
+            </div>
           </div>
 
           <div style={LOG_PANE_STYLE} ref={logsContainerRef}>
-            {logs.length === 0 ? (
+            {filteredLogs.length === 0 ? (
               <div style={{ color: "var(--nw-muted)", textAlign: "center", padding: "3rem 0", opacity: .4 }}>
-                Логи відсутні
+                {logFilter ? "Нічого не знайдено" : "Логи відсутні"}
               </div>
             ) : (
-              logs.map((log) => (
+              filteredLogs.map((log) => (
                 <div
                   key={log.id || log.timestamp}
                   style={{
                     display: "flex", gap: 12, marginBottom: 4,
                     paddingBottom: 4,
-                    borderBottom: "1px solid rgba(255,255,255,.04)",
+                    borderBottom: "1px solid var(--nw-border)",
                   }}
                 >
                   <span style={{ color: "var(--nw-muted)", opacity: .5, minWidth: 72, flexShrink: 0 }}>
@@ -115,7 +158,6 @@ export default function Terminal({
         </div>
       </Col>
 
-      {/* Network flows */}
       <Col lg={6}>
         <div style={PANEL_STYLE}>
           <div style={HEADER_STYLE}>
@@ -125,23 +167,45 @@ export default function Terminal({
                 fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase",
                 letterSpacing: ".06em", color: "var(--nw-text)",
               }}>
-                Мережеві потоки
+                Пакети
               </span>
             </div>
-            <ClearBtn onClick={() => { setPackets({}); setSessionOrder([]); }} title="Очистити потоки" />
+            
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ position: "relative", width: 160 }}>
+                <Search size={12} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--nw-muted)" }} />
+                <input
+                  type="text"
+                  placeholder="Пошук..."
+                  value={flowFilter}
+                  onChange={e => setFlowFilter(e.target.value)}
+                  style={{
+                    width: "100%",
+                    background: "var(--nw-surface)",
+                    border: "1px solid var(--nw-border)",
+                    borderRadius: 6,
+                    padding: "2px 8px 2px 26px",
+                    fontSize: ".68rem",
+                    color: "var(--nw-text)",
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <ClearBtn onClick={() => { setPackets({}); setSessionOrder([]); }} title="Очистити потоки" />
+            </div>
           </div>
 
           <div style={{ ...LOG_PANE_STYLE, fontFamily: undefined }} ref={undefined}>
-            {sessionOrder.length === 0 ? (
+            {filteredOrder.length === 0 ? (
               <div style={{
                 color: "var(--nw-muted)", textAlign: "center",
                 padding: "3rem 0", opacity: .4,
                 fontFamily: "JetBrains Mono, monospace", fontSize: ".72rem",
               }}>
-                Активність відсутня
+                {flowFilter ? "Нічого не знайдено" : "Активність відсутня"}
               </div>
             ) : (
-              sessionOrder.map((key) => {
+              filteredOrder.map((key) => {
                 const flow = packets[key];
                 if (!flow) return null;
                 const flags = flow.flags || {};
@@ -152,12 +216,32 @@ export default function Terminal({
                   <div
                     key={key}
                     style={{
-                      background: "rgba(255,255,255,.025)",
+                      background: "var(--nw-surface)",
                       border: "1px solid var(--nw-border)",
                       borderRadius: 7, padding: ".55rem .75rem",
                       marginBottom: 6,
                     }}
                   >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span 
+                        className="font-monospace" 
+                        title="Натисніть, щоб скопіювати"
+                        onClick={() => {
+                          navigator.clipboard.writeText(flow.flow_id);
+                        }}
+                        style={{ 
+                          fontSize: ".6rem", color: "var(--nw-muted)", opacity: 0.7, 
+                          cursor: "pointer", userSelect: "none" 
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = "var(--nw-accent)"}
+                        onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
+                      >
+                        ID: {flow.flow_id}
+                      </span>
+                      <span style={{ fontSize: ".68rem", color: "var(--nw-muted)" }}>
+                        Пакетів: <span style={{ color: "var(--nw-text)", fontWeight: 600 }}>{flow.count}</span>
+                      </span>
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: Object.keys(flags).length ? 6 : 0 }}>
                       {/* Protocol badge */}
                       <span style={{
@@ -177,22 +261,17 @@ export default function Terminal({
                       <span className="font-monospace" style={{ fontSize: ".7rem", fontWeight: 600, color: "var(--nw-text)" }}>
                         {flow.dst}
                       </span>
-
-                      {/* Packet count */}
-                      <span style={{ marginLeft: "auto", fontSize: ".68rem", color: "var(--nw-muted)" }}>
-                        пк: <span style={{ color: "var(--nw-text)", fontWeight: 600 }}>{flow.count}</span>
-                      </span>
                     </div>
 
                     {/* TCP flags */}
                     {flow.protocol === 6 && Object.keys(flags).length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
                         {Object.entries(flags).map(([flag, count]) => (
                           <span
                             key={flag}
                             style={{
                               fontSize: ".58rem", padding: "1px 6px", borderRadius: 5,
-                              background: "rgba(255,255,255,.04)",
+                              background: "var(--nw-inset)",
                               border: "1px solid var(--nw-border)",
                               color: "var(--nw-muted)",
                               fontFamily: "JetBrains Mono, monospace",
@@ -202,6 +281,36 @@ export default function Terminal({
                             <span style={{ color: "var(--nw-text)" }}>{count}</span>
                           </span>
                         ))}
+                      </div>
+                    )}
+
+                    {flow.ports && Object.keys(flow.ports).length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        <span style={{ fontSize: ".58rem", color: "var(--nw-muted)", marginRight: 2, alignSelf: "center" }}>
+                          Порти:
+                        </span>
+                        {Object.entries(flow.ports)
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 5)
+                          .map(([port]) => (
+                            <span
+                              key={port}
+                              style={{
+                                fontSize: ".58rem", padding: "1px 6px", borderRadius: 5,
+                                background: "var(--nw-accent)10",
+                                border: "1px solid var(--nw-accent)30",
+                                color: "var(--nw-accent)",
+                                fontFamily: "JetBrains Mono, monospace",
+                              }}
+                            >
+                              {port}
+                            </span>
+                          ))}
+                        {Object.keys(flow.ports).length > 5 && (
+                          <span style={{ fontSize: ".58rem", color: "var(--nw-muted)", alignSelf: "center" }}>
+                            +{Object.keys(flow.ports).length - 5} ще
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

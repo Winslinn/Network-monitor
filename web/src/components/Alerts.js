@@ -4,10 +4,10 @@ import { SEV_ICON } from "./Toasts";
 import { TYPE_LABELS } from "../App";
 
 const SEV_CONFIG = {
-  critical: { color: "var(--nw-danger)",  bg: "rgba(244,63,94,.07)",  border: "rgba(244,63,94,.3)",  label: "Критично" },
-  high:     { color: "var(--nw-danger)",  bg: "rgba(244,63,94,.05)",  border: "rgba(244,63,94,.25)", label: "Високий" },
-  medium:   { color: "var(--nw-warning)", bg: "rgba(245,158,11,.05)", border: "rgba(245,158,11,.25)", label: "Середній" },
-  low:      { color: "var(--nw-info)",    bg: "rgba(56,189,248,.04)", border: "rgba(56,189,248,.2)",  label: "Низький" },
+  critical: { color: "var(--nw-danger)",  bg: "rgba(244,63,94,.07)",  border: "var(--nw-danger)",  label: "Критично" },
+  high:     { color: "var(--nw-danger)",  bg: "rgba(244,63,94,0)",  border: "var(--nw-danger)", label: "Високий" },
+  medium:   { color: "var(--nw-warning)", bg: "rgba(245,158,11,0)", border: "var(--nw-warning)", label: "Середній" },
+  low:      { color: "var(--nw-info)",    bg: "rgba(56,189,248,0)", border: "var(--nw-border)",  label: "Низький" },
 };
 
 const FILTER_LABELS = { all: "Всі", low: "Низький", medium: "Середній", high: "Високий", critical: "Критично" };
@@ -24,17 +24,18 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
     <div style={{
       background: "var(--nw-surface)",
       border: "1px solid var(--nw-border)",
-      borderRadius: 14,
+      borderRadius: "var(--nw-radius)",
     }}>
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: "1rem",
-        padding: "1.25rem 1.5rem",
+        padding: "0.85rem 1rem",
         borderBottom: "1px solid var(--nw-border)",
+        background: "var(--nw-inset)",
       }}>
         {/* Filters */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {Object.entries(FILTER_LABELS).map(([key, label]) => {
             const cfg = SEV_CONFIG[key];
             const isActive = alertFilter === key;
@@ -43,9 +44,9 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                 key={key}
                 onClick={() => setAlertFilter(key)}
                 style={{
-                  padding: "4px 14px", borderRadius: 99, cursor: "pointer",
-                  fontSize: ".72rem", fontWeight: 700, letterSpacing: ".04em",
-                  textTransform: "uppercase", transition: "all .15s",
+                  padding: "2px 10px", borderRadius: "var(--nw-radius)", cursor: "pointer",
+                  fontSize: ".65rem", fontWeight: 800, letterSpacing: ".05em",
+                  textTransform: "uppercase",
                   border: isActive
                     ? `1px solid ${cfg ? cfg.color : "var(--nw-accent)"}`
                     : "1px solid var(--nw-border)",
@@ -59,7 +60,7 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
               >
                 {label}
                 {key !== "all" && (
-                  <span style={{ marginLeft: 5, opacity: .6 }}>
+                  <span style={{ marginLeft: 5, opacity: .5 }}>
                     {alerts.filter(a => a.severity?.toLowerCase() === key).length}
                   </span>
                 )}
@@ -70,28 +71,19 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
 
         <button
           onClick={handleClear}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "5px 14px", borderRadius: 8, cursor: "pointer",
-            fontSize: ".78rem", fontWeight: 600,
-            background: "transparent",
-            border: "1px solid rgba(244,63,94,.3)",
-            color: "var(--nw-danger)", transition: "all .15s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "rgba(244,63,94,.07)"}
-          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+          className="btn btn-outline-danger"
+          style={{ padding: "3px 10px" }}
         >
-          <Trash2 size={13} />
+          <Trash2 size={12} style={{ marginRight: 6 }} />
           Очистити
         </button>
       </div>
 
       {/* List */}
-      <div style={{ padding: "1rem 1.25rem" }}>
+      <div style={{ padding: "1rem" }}>
         {filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--nw-muted)" }}>
-            <Bell size={36} style={{ opacity: .25, marginBottom: 12, display: "block", margin: "0 auto 12px" }} />
-            <div style={{ fontSize: ".85rem", fontWeight: 500 }}>Журнал подій порожній</div>
+          <div style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--nw-muted)", textTransform: "uppercase", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em" }}>
+            Подій не зафіксовано
           </div>
         ) : (
           <Stack gap={2}>
@@ -108,30 +100,53 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                   }}
                 >
                   {/* Icon stripe */}
-                  <div className="nw-event-icon" style={{ background: `${cfg.bg}`, color: cfg.color }}>
+                  <div className="nw-event-icon" style={{ background: sev === "critical" ? "var(--nw-danger)" : "transparent", color: sev === "critical" ? "#000" : cfg.color, borderRight: sev === "critical" ? "none" : `1px solid ${cfg.border}` }}>
                     <span role="img" aria-label={sev}>{SEV_ICON[sev] || "⚡"}</span>
                   </div>
 
                   {/* Body */}
                   <div className="nw-event-body">
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontSize: ".85rem", fontWeight: 700, color: "var(--nw-text)" }}>
-                        {TYPE_LABELS[a.type] || a.type}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: ".8rem", fontWeight: 800, color: "var(--nw-text)" }}>
+                          {TYPE_LABELS[a.type] || a.type}
+                        </span>
+                        {a.count > 1 && (
+                          <Badge bg="danger" style={{ fontSize: ".6rem", borderRadius: 4, padding: "2px 5px" }}>
+                            x{a.count}
+                          </Badge>
+                        )}
+                      </div>
                       <span style={{
-                        fontSize: ".62rem", fontWeight: 700, textTransform: "uppercase",
+                        fontSize: ".6rem", fontWeight: 800, textTransform: "uppercase",
                         letterSpacing: ".05em", color: cfg.color,
-                        background: cfg.bg, border: `1px solid ${cfg.border}`,
-                        borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0,
+                        background: "transparent", border: `1px solid ${cfg.border}`,
+                        borderRadius: "var(--nw-radius)", padding: "1px 6px", whiteSpace: "nowrap", flexShrink: 0,
                       }}>
                         {cfg.label}
                       </span>
                     </div>
-                    <p style={{ margin: "4px 0 6px", fontSize: ".8rem", color: "var(--nw-muted)" }}>
+                    <p style={{ margin: "2px 0 4px", fontSize: ".75rem", color: "var(--nw-muted)", fontWeight: 600 }}>
                       {a.description}
                     </p>
-                    <div className="font-monospace" style={{ fontSize: ".68rem", color: "var(--nw-muted)", opacity: .6 }}>
-                      {fmtDate(a.timestamp * 1000)}
+                    <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", opacity: .6, display: "flex", gap: 12 }}>
+                      <span>{fmtDate(a.last_seen || a.timestamp)}</span>
+                      {a.flow_id && (
+                        <span 
+                          title="Натисніть, щоб скопіювати HASH"
+                          onClick={() => {
+                            navigator.clipboard.writeText(a.flow_id);
+                          }}
+                          style={{ 
+                            cursor: "pointer", userSelect: "none", 
+                            color: "var(--nw-muted)" 
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.color = "var(--nw-accent)"}
+                          onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
+                        >
+                          ID: {a.flow_id}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
