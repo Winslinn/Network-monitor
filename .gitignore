@@ -1,7 +1,6 @@
 # Ignoring node modules and source files
 **/node_modules/
-**/config/
-src/network.db
+*.db
 
 # Ignoring build artifacts
 **/build/
@@ -16,9 +15,8 @@ __pycache__/
 *.crt
 .vscode
 .venv
-*.code-workspace
+**workspace
 
 # Ignoring React build artifacts
 **/node_modules
 **/public
-

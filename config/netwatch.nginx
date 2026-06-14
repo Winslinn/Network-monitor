@@ -1,0 +1,58 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    server_name potyshyi_server; 
+
+    location / {
+        return 301 https://$host:8443$request_uri;
+    }
+}
+
+server {
+    listen 8443 ssl default_server;
+    listen [::]:8443 ssl default_server;
+    
+    server_name _;
+
+    ssl_certificate /etc/ssl/certs/cert.crt;
+    ssl_certificate_key /etc/ssl/private/my_key.key;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    gzip off;
+
+    root /var/www/html;
+    index index.html index.htm;
+
+    location / {
+	try_files $uri $uri/ /index.html;	
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+
+    location /api/ {
+        proxy_pass http://localhost:8000;
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        proxy_buffering off;
+    }
+}

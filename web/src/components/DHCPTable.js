@@ -2,7 +2,7 @@ import { Search, Monitor } from "lucide-react";
 
 const STATUS_CFG = {
   active:  { color: "var(--nw-success)", label: "Активний" },
-  expired: { color: "var(--nw-danger)",  label: "Закінчився" },
+  expired: { color: "var(--nw-danger)",  label: "Застарів" },
   waiting: { color: "var(--nw-warning)", label: "Очікування" },
 };
 
