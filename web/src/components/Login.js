@@ -69,14 +69,17 @@ export default function Login({ onLoginSuccess }) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} id="login-form" name="login">
             {/* Username */}
             <div style={{ marginBottom: "1rem" }}>
-              <label style={{
-                display: "block", fontSize: ".65rem", fontWeight: 800,
-                color: "var(--nw-muted)", marginBottom: ".4rem", letterSpacing: ".08em",
-                textTransform: "uppercase"
-              }}>
+              <label
+                htmlFor="username"
+                style={{
+                  display: "block", fontSize: ".65rem", fontWeight: 800,
+                  color: "var(--nw-muted)", marginBottom: ".4rem", letterSpacing: ".08em",
+                  textTransform: "uppercase"
+                }}
+              >
                 Логін
               </label>
               <div style={{ position: "relative" }}>
@@ -89,9 +92,12 @@ export default function Login({ onLoginSuccess }) {
                   }}
                 />
                 <input
+                  id="username"
+                  name="username"
                   type="text"
                   autoFocus
                   autoComplete="username"
+                  aria-label="Логін"
                   required
                   value={username}
                   onChange={e => setUsername(e.target.value)}
@@ -110,11 +116,14 @@ export default function Login({ onLoginSuccess }) {
 
             {/* Password */}
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{
-                display: "block", fontSize: ".65rem", fontWeight: 800,
-                color: "var(--nw-muted)", marginBottom: ".4rem", letterSpacing: ".08em",
-                textTransform: "uppercase"
-              }}>
+              <label
+                htmlFor="password"
+                style={{
+                  display: "block", fontSize: ".65rem", fontWeight: 800,
+                  color: "var(--nw-muted)", marginBottom: ".4rem", letterSpacing: ".08em",
+                  textTransform: "uppercase"
+                }}
+              >
                 Пароль
               </label>
               <div style={{ position: "relative" }}>
@@ -127,8 +136,11 @@ export default function Login({ onLoginSuccess }) {
                   }}
                 />
                 <input
+                  id="password"
+                  name="password"
                   type={showPass ? "text" : "password"}
                   autoComplete="current-password"
+                  aria-label="Пароль"
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
