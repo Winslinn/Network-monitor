@@ -18,4 +18,3 @@ __pycache__/
 
 # Ignoring React build artifacts
 **/node_modules
-**/public
