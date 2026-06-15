@@ -1,12 +1,15 @@
 import sqlalchemy as sa
 import bcrypt
+
+from os import getenv
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker, DeclarativeBase, relationship, selectinload
 from sqlalchemy.inspection import inspect
 from sqlalchemy.dialects.sqlite import insert
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta, timezone
 
-engine = sa.create_engine("sqlite:///network.db", echo=False)
+PROJECT_ROOT = getenv('PROJECT_ROOT')
+engine = sa.create_engine(f"sqlite:///{PROJECT_ROOT}/src/network.db", echo=False)
 Session = sessionmaker(bind=engine)
 
 class Base(DeclarativeBase):

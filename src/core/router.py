@@ -5,6 +5,7 @@ from librouteros import connect
 from librouteros.exceptions import LibRouterosError
 from utils.snmp import *
 from utils.database import Session, Router, Client
+from librouteros.login import token as token_login
 
 PROJECT_ROOT = getenv('PROJECT_ROOT')
 
@@ -15,8 +16,9 @@ class RouterManager:
     def __init__(self):
         self.connection = connect(
             host=config['router']['ip'],
-            username='admin',
-            password='admin',
+            username=config['router']['username'],
+            password=config['router']['password'],
+            login_method=token_login,
             timeout=10
         )
         self.data = {}

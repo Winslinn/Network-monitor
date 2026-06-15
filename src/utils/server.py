@@ -35,6 +35,7 @@ app.add_middleware(
     allow_origins=[
         "https://potyshyi-server:3001", 
         "https://potyshyi-server",
+        "https://100.101.30.34"
     ], 
     allow_credentials=True,
     allow_methods=["*"],
