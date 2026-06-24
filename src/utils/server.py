@@ -198,7 +198,7 @@ async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] =
 def run_websocket(log_queue, flow_queue, result_queue):
     init_db()
     async def serve():
-        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None, workers=4)
+        config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None)
         server = uvicorn.Server(config)
         
         await asyncio.gather(

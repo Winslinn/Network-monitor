@@ -5,6 +5,7 @@ from librouteros import connect
 from librouteros.exceptions import LibRouterosError
 from utils.snmp import *
 from utils.database import Session, Router, Client
+
 from librouteros.login import token as token_login
 
 PROJECT_ROOT = getenv('PROJECT_ROOT')
@@ -14,22 +15,27 @@ with open(f'{PROJECT_ROOT}/config.yaml', 'r') as f:
 
 class RouterManager:
     def __init__(self):
-        self.connection = connect(
-            host=config['router']['ip'],
-            username=config['router']['username'],
-            password=config['router']['password'],
-            login_method=token_login,
-            timeout=10
-        )
-        self.data = {}
-        
-        self._providers = {
-            'arp': self._fetch_arp,
-            'interfaces': self._fetch_interfaces,
-            'network_info': self._fetch_network_info,
-            'router_db': self._fetch_router_db,
-            'dhcp': self._fetch_dhcp
-        }
+        try:
+            self.connection = connect(
+                host=config['router']['ip'],
+                username=config['router']['username'],
+                password=config['router']['password'],
+                timeout=10
+            )
+            self.data = {}
+            
+            self._providers = {
+                'arp': self._fetch_arp,
+                'interfaces': self._fetch_interfaces,
+                'network_info': self._fetch_network_info,
+                'router_db': self._fetch_router_db,
+                'dhcp': self._fetch_dhcp
+            }
+        except Exception as e:
+            print(f"Error initializing RouterManager: {e}")
+            self.connection = None
+            self.data = {}
+            self._providers = {}
         
     def _get_connection(self):
         if self.connection is None:
@@ -45,10 +51,14 @@ class RouterManager:
         self.connection = None
         
     def _fetch_arp(self):
-        self.data['arp'] = list(
-            self.connection.path('ip', 'arp')
-            .select('address', 'mac-address', 'interface', 'status')
-        )
+        try:
+            self.data['arp'] = list(
+                self.connection.path('ip', 'arp')
+                .select('address', 'mac-address', 'interface', 'status')
+            )
+        except Exception as e:
+            print(f"Error fetching ARP data: {e}")
+            self.data['arp'] = []
     
     def _fetch_dhcp(self):
         self.data['dhcp'] = list(

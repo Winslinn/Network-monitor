@@ -13,7 +13,7 @@ __pycache__/
 .env
 *.crt
 .vscode
-.venv
+venv
 **workspace
 
 # Ignoring React build artifacts
