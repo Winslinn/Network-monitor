@@ -218,9 +218,9 @@ def init_db():
             session.add(new_admin)
             session.commit()
 
-            print(" Use the following credentials to log in and change the password immediately: ")
-            print(f" Username: {username}")
-            print(f" Password: {password}")
+            print(" Use the following credentials to log in and change the password immediately: ", flush=True)
+            print(f" Username: {username}", flush=True)
+            print(f" Password: {password}", flush=True)
 
 
 def get_user(username: str) -> Optional[Dict[str, Any]]:

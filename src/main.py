@@ -1,6 +1,5 @@
 import asyncio
 import signal
-
 from multiprocessing import Process, Queue
 
 from utils.logmanager import log_collector
@@ -24,15 +23,19 @@ async def main():
     stop_event = asyncio.Event()
 
     loop = asyncio.get_running_loop()
-    loop.add_signal_handler(signal.SIGTERM, stop_event.set)
-    loop.add_signal_handler(signal.SIGINT, stop_event.set)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except NotImplementedError:
+            pass
 
-    await stop_event.wait()
-
-    for process in processes:
-        if process.is_alive():
-            process.terminate()
-            process.join()
+    try:
+        await stop_event.wait()
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+                process.join()
 
 if __name__ == "__main__":
     asyncio.run(main())

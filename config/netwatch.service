@@ -5,8 +5,8 @@ After=network.target
 [Service]
 User=www-data
 WorkingDirectory=/opt/netwatch
-EnvironmentFile=-/opt/netwatch/.env
-ExecStart=/opt/netwatch/venv/bin/python3 /opt/netwatch/src/main.py
+EnvironmentFile=/opt/netwatch/.env
+ExecStart=/opt/netwatch/venv/bin/python3.14 src/main.py
 Restart=always
 
 [Install]
