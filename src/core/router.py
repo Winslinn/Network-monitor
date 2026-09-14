@@ -176,12 +176,12 @@ async def check_active_clients(manager):
                 else:
                     if dhcp_status == 'bound':
                         new_client = Client(
-                        mac=mac, 
-                        ip=lease.get('address'), 
-                        hostname=lease.get('host-name'), 
-                        status=status, 
-                        router_id=1
-                    )
+                            mac=mac, 
+                            ip=lease.get('address'), 
+                            hostname=lease.get('host-name'), 
+                            status=status, 
+                            router_id=1
+                        )
                     session.add(new_client)
                     await manager.broadcast({
                         "context": "dhcp", 
