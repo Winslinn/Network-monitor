@@ -24,7 +24,7 @@ server {
 
     gzip off;
 
-    root /var/www/html;
+    root /opt/netwatch/web/build;
     index index.html index.htm;
 
     location / {

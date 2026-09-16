@@ -1,13 +1,16 @@
 import { Search, Monitor } from "lucide-react";
 
 const STATUS_CFG = {
-  active:  { color: "var(--nw-success)", label: "Активний" },
-  expired: { color: "var(--nw-danger)",  label: "Застарів" },
-  waiting: { color: "var(--nw-warning)", label: "Очікування" },
+  reachable: { color: "var(--nw-success)", label: "Активний" },
+  stale: { color: "var(--nw-muted)", label: "Неактивний" },
+  failed: { color: "var(--nw-danger)", label: "Недоступний" },
+  incomplete: { color: "var(--nw-warning)", label: "Невизначений" },
+  permanent: { color: "var(--nw-primary)", label: "Призначений" },
+  probe: { color: "var(--nw-secondary)", label: "Перевіряється" }
 };
 
 export default function DHCPTable({ clients, search, setSearch }) {
-  const activeCount = clients.filter(c => c.status === "active").length;
+  const activeCount = clients.filter(c => c.status === "reachable").length;
   const filtered = clients.filter(c =>
     !search ||
     c.ip?.includes(search) ||
@@ -92,7 +95,7 @@ export default function DHCPTable({ clients, search, setSearch }) {
                 </td>
               </tr>
             ) : filtered.map((c) => {
-              const cfg = STATUS_CFG[c.status] || { color: "var(--nw-muted)", label: c.status };
+              const cfg = STATUS_CFG[c.status] || { color: c.color, label: c.label };
               return (
                 <tr
                   key={c.id || c.mac}

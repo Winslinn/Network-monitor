@@ -6,8 +6,6 @@ from librouteros.exceptions import LibRouterosError
 from utils.snmp import *
 from utils.database import Session, Router, Client
 
-from librouteros.login import token as token_login
-
 PROJECT_ROOT = getenv('PROJECT_ROOT')
 
 with open(f'{PROJECT_ROOT}/config.yaml', 'r') as f:
@@ -135,8 +133,8 @@ async def check_active_clients(manager):
         async with router_lock:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(
-                None, 
-                lambda: router_manager.fetch_data({'arp', 'dhcp'}
+                    None, 
+                    lambda: router_manager.fetch_data({'arp', 'dhcp'}
                 )
             )
 
@@ -151,22 +149,23 @@ async def check_active_clients(manager):
             db_clients = session.query(Client).all()
             clients_map = {c.mac: c for c in db_clients}
 
+            new_clients = []
+
             for lease in dhcp_clients:
                 mac = lease.get('mac-address')
                     
                 dhcp_status = lease.get('status')
                 arp_status = arp_map.get(mac)
-                if dhcp_status == 'bound' and arp_status in ['reachable', 'delay', 'stale']:
-                    status = 'active'
-                else:
-                    status = 'expired'
+                arp_status = 'reachable' if arp_status == 'delay' else arp_status
 
                 client = clients_map.get(mac)
                 if client:
-                    if client.status != status or client.ip != lease.get('address'):
-                        client.status = status
+                    if client.status != arp_status or client.ip != lease.get('address'):
+
+                        client.status = arp_status
                         client.ip = lease.get('address')
                         client.hostname = lease.get('host-name')
+
                         await manager.broadcast({
                                 "context": "dhcp", 
                                 "client_id": client.id, 
@@ -179,15 +178,24 @@ async def check_active_clients(manager):
                             mac=mac, 
                             ip=lease.get('address'), 
                             hostname=lease.get('host-name'), 
-                            status=status, 
+                            status=arp_status, 
                             router_id=1
                         )
-                    session.add(new_client)
-                    await manager.broadcast({
-                        "context": "dhcp", 
-                        "client_id": new_client.id, 
-                        "data": new_client.to_dict()})
+
+                        session.add(new_client)
+                        new_clients.append(new_client)
+
             session.commit()
+            if new_clients:
+                for _, client in new_clients:
+                    await manager.broadcast(
+                        {
+                            "context": "dhcp",
+                            "client_id": client.id,
+                            "data": client.to_dict()
+                        }
+                    )
+
         await asyncio.sleep(30)
     
 async def init(manager):
@@ -197,8 +205,8 @@ async def init(manager):
     async with router_lock:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
-            None, lambda: router_manager.fetch_data({'arp', 'dhcp'}, exception=True
-            )
+            None, 
+            lambda: router_manager.fetch_data({'arp', 'dhcp'}, exception=True)
         )
     
     asyncio.create_task(check_active_clients(manager))
@@ -249,7 +257,10 @@ async def init(manager):
             print(f"Error fetching interface speeds: {e}")
             router_manager.reset_connection()
         
-        stats = next((item for item in all_interfaces if item.get('type') == 'bridge'), None)
+        stats = next(
+            (item for item in all_interfaces if item.get('type') == 'bridge'),
+            None
+        )
         if stats:
             curr_in = int(stats.get('rx-byte'))
             curr_out = int(stats.get('tx-byte'))

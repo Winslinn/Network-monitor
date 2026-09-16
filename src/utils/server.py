@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
 from utils.database import Session, Router, init_db
-from utils.logmanager import watch_logs, watch_flows, watch_results
+from utils.logmanager import watch_flows, watch_results
 from core.router import init as init_router, router_manager
 from utils.snmp import close_snmp
 
@@ -35,7 +35,8 @@ app.add_middleware(
     allow_origins=[
         "https://potyshyi-server:3001", 
         "https://potyshyi-server",
-        "https://100.101.30.34"
+        "https://100.101.30.34",
+        "https://192.168.0.240"
     ], 
     allow_credentials=True,
     allow_methods=["*"],
@@ -195,7 +196,7 @@ async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] =
         pass
     finally:
         await manager.disconnect(websocket)
-def run_websocket(log_queue, flow_queue, result_queue):
+def run_websocket(flow_queue, result_queue):
     init_db()
     async def serve():
         config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_config=None)
@@ -203,7 +204,6 @@ def run_websocket(log_queue, flow_queue, result_queue):
         
         await asyncio.gather(
             server.serve(),
-            watch_logs(log_queue, manager),
             watch_flows(flow_queue, manager),
             watch_results(result_queue, manager)
         )
