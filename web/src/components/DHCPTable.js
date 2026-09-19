@@ -1,12 +1,8 @@
 import { Search, Monitor } from "lucide-react";
 
-const STATUS_CFG = {
-  reachable: { color: "var(--nw-success)", label: "Активний" },
-  stale: { color: "var(--nw-muted)", label: "Неактивний" },
-  failed: { color: "var(--nw-danger)", label: "Недоступний" },
-  incomplete: { color: "var(--nw-warning)", label: "Невизначений" },
-  permanent: { color: "var(--nw-primary)", label: "Призначений" },
-  probe: { color: "var(--nw-secondary)", label: "Перевіряється" }
+const STATUS_LABEL = {
+  reachable: "Активний", stale: "Неактивний", failed: "Недоступний",
+  incomplete: "Невизначений", permanent: "Призначений", probe: "Перевіряється",
 };
 
 export default function DHCPTable({ clients, search, setSearch }) {
@@ -19,65 +15,40 @@ export default function DHCPTable({ clients, search, setSearch }) {
   );
 
   return (
-    <div style={{
-      background: "var(--nw-surface)",
-      border: "1px solid var(--nw-border)",
-      borderRadius: "var(--nw-radius)", overflow: "hidden",
-    }}>
+    <div className="nw-panel nw-panel-clip">
       {/* Header */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: "1rem",
-        padding: "0.85rem 1rem",
-        borderBottom: "1px solid var(--nw-border)",
-        background: "var(--nw-inset)",
-      }}>
+      <div className="nw-panel-header">
         <div>
-          <h5 style={{ margin: 0, fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.05em" }}>Пристрої мережі</h5>
-          <div style={{ marginTop: 2, fontSize: ".65rem", color: "var(--nw-muted)", fontWeight: 600 }}>
-            <span style={{ color: "var(--nw-success)" }}>{activeCount} активних</span>
-            <span style={{ color: "var(--nw-border)", margin: "0 6px" }}>|</span>
+          <h5 className="panel-title">Пристрої мережі</h5>
+          <div className="panel-subtitle">
+            <span className="success-text">{activeCount} активних</span>
+            <span className="separator">|</span>
             {clients.length} всього
           </div>
         </div>
 
         {/* Search */}
-        <div style={{ position: "relative", width: 220 }}>
-          <Search size={12} style={{
-            position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-            color: "var(--nw-muted)", pointerEvents: "none",
-          }} />
+        <div className="table-search">
+          <Search size={12} className="search-icon" />
           <input
             type="text"
             placeholder="Фільтр пристроїв…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{
-              width: "100%", padding: ".4rem .7rem .4rem 2rem",
-              background: "var(--nw-bg)",
-              border: "1px solid var(--nw-border)",
-              borderRadius: "var(--nw-radius)", color: "var(--nw-text)", fontSize: ".75rem",
-              outline: "none", boxSizing: "border-box",
-            }}
+            className="table-search-input"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="table-scroll">
+        <table className="nw-table">
           <thead>
-            <tr style={{ background: "rgba(0,0,0,0.02)", borderBottom: "1px solid var(--nw-border)" }}>
+            <tr className="nw-table-header">
               {["Пристрій", "MAC-адреса", "IP-адреса", "Статус"].map((h, i) => (
                 <th
                   key={h}
-                  style={{
-                    padding: ".6rem 1rem",
-                    fontSize: ".6rem", fontWeight: 800,
-                    letterSpacing: ".08em", color: "var(--nw-muted)",
-                    textAlign: i === 3 ? "right" : "left",
-                    background: "transparent", border: "none",
-                  }}
+                  className={i === 3 ? "text-end" : ""}
                 >
                   {h}
                 </th>
@@ -87,58 +58,44 @@ export default function DHCPTable({ clients, search, setSearch }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{
-                  textAlign: "center", padding: "2rem",
-                  color: "var(--nw-muted)", fontSize: ".75rem", letterSpacing: "0.05em"
-                }}>
+                <td colSpan={4} className="empty-table-state">
                   Дані відсутні
                 </td>
               </tr>
             ) : filtered.map((c) => {
-              const cfg = STATUS_CFG[c.status] || { color: c.color, label: c.label };
               return (
                 <tr
                   key={c.id || c.mac}
-                  style={{ borderBottom: "1px solid var(--nw-border)" }}
+                  className="nw-table-row"
                 >
                   {/* Device */}
-                  <td style={{ padding: ".6rem 1rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Monitor size={12} style={{ color: "var(--nw-accent)", flexShrink: 0 }} />
-                      <span style={{ fontWeight: 700, fontSize: ".75rem" }}>
+                  <td className="nw-table-cell">
+                    <div className="device-name">
+                      <Monitor size={12} className="device-icon" />
+                      <span>
                         {c.hostname || "UNKNOWN"}
                       </span>
                     </div>
                   </td>
 
                   {/* MAC */}
-                  <td style={{ padding: ".6rem 1rem" }}>
-                    <span className="font-monospace" style={{ fontSize: ".7rem", color: "var(--nw-muted)" }}>
+                  <td className="nw-table-cell">
+                    <span className="font-monospace mac-address">
                       {c.mac}
                     </span>
                   </td>
 
                   {/* IP */}
-                  <td style={{ padding: ".6rem 1rem" }}>
-                    <span className="font-monospace" style={{
-                      fontSize: ".75rem", fontWeight: 700, color: "var(--nw-accent)",
-                    }}>
+                  <td className="nw-table-cell">
+                    <span className="font-monospace ip-address">
                       {c.ip}
                     </span>
                   </td>
 
                   {/* Status */}
-                  <td style={{ padding: ".6rem 1rem", textAlign: "right" }}>
-                    <span style={{
-                      display: "inline-flex", alignItems: "center", gap: 5,
-                      fontSize: ".6rem", fontWeight: 800,
-                      letterSpacing: ".05em", padding: "2px 8px",
-                      color: cfg.color,
-                      border: `1px solid ${cfg.color}40`,
-                      background: `${cfg.color}08`,
-                      borderRadius: "var(--nw-radius)",
-                    }}>
-                      {cfg.label}
+                  <td className="nw-table-cell text-end">
+                    <span className={`device-status status-${c.status}`}>
+                      {STATUS_LABEL[c.status] || c.label || c.status}
                     </span>
                   </td>
                 </tr>

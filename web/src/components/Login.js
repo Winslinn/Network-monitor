@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Form, Button, Alert, Spinner } from "react-bootstrap";
-import { Shield, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Lock, User, Eye, EyeOff } from "lucide-react";
 
 export default function Login({ onLoginSuccess }) {
   const [username, setUsername]       = useState("");
@@ -34,63 +33,27 @@ export default function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "var(--nw-bg)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "1rem",
-      position: "relative",
-      overflow: "hidden",
-    }}>
-      <div style={{
-        width: "100%", maxWidth: 360, position: "relative", zIndex: 1,
-      }}>
+    <div className="login-page">
+      <div className="login-wrapper">
         {/* Card */}
-        <div style={{
-          background: "var(--nw-surface)",
-          border: "1px solid var(--nw-border)",
-          borderRadius: "var(--nw-radius)",
-          padding: "1.75rem",
-        }}>
+        <div className="login-card">
           {error && (
-            <div
-              style={{
-                padding: ".5rem .75rem",
-                background: "rgba(244,63,94,.05)",
-                border: "1px solid var(--nw-danger)",
-                borderRadius: "var(--nw-radius)", color: "var(--nw-danger)",
-                fontSize: "0.75rem", fontWeight: 700, marginBottom: "1.25rem",
-                textTransform: "uppercase", textAlign: "center"
-              }}
-            >
+            <div className="login-error">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} id="login-form" name="login">
             {/* Username */}
-            <div style={{ marginBottom: "1rem" }}>
+            <div className="login-field login-field-username">
               <label
                 htmlFor="username"
-                style={{
-                  display: "block", fontSize: ".65rem", fontWeight: 800,
-                  color: "var(--nw-muted)", marginBottom: ".4rem", letterSpacing: ".08em",
-                  textTransform: "uppercase"
-                }}
+                className="login-label"
               >
                 Логін
               </label>
-              <div style={{ position: "relative" }}>
-                <User
-                  size={14}
-                  style={{
-                    position: "absolute", left: 12, top: "50%",
-                    transform: "translateY(-50%)", color: "var(--nw-muted)",
-                    pointerEvents: "none",
-                  }}
-                />
+              <div className="login-input-wrapper">
+                <User size={14} className="login-input-icon" />
                 <input
                   id="username"
                   name="username"
@@ -102,39 +65,21 @@ export default function Login({ onLoginSuccess }) {
                   value={username}
                   onChange={e => setUsername(e.target.value)}
                   placeholder="Введіть логін"
-                  style={{
-                    width: "100%", padding: ".5rem 1rem .5rem 2.2rem",
-                    background: "var(--nw-inset)",
-                    border: "1px solid var(--nw-border)",
-                    borderRadius: "var(--nw-radius)", color: "var(--nw-text)",
-                    fontSize: ".8rem", outline: "none",
-                    boxSizing: "border-box",
-                  }}
+                  className="login-input username-input"
                 />
               </div>
             </div>
 
             {/* Password */}
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div className="login-field login-field-password">
               <label
                 htmlFor="password"
-                style={{
-                  display: "block", fontSize: ".65rem", fontWeight: 800,
-                  color: "var(--nw-muted)", marginBottom: ".4rem", letterSpacing: ".08em",
-                  textTransform: "uppercase"
-                }}
+                className="login-label"
               >
                 Пароль
               </label>
-              <div style={{ position: "relative" }}>
-                <Lock
-                  size={14}
-                  style={{
-                    position: "absolute", left: 12, top: "50%",
-                    transform: "translateY(-50%)", color: "var(--nw-muted)",
-                    pointerEvents: "none",
-                  }}
-                />
+              <div className="login-input-wrapper">
+                <Lock size={14} className="login-input-icon" />
                 <input
                   id="password"
                   name="password"
@@ -145,24 +90,12 @@ export default function Login({ onLoginSuccess }) {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Введіть пароль"
-                  style={{
-                    width: "100%", padding: ".5rem 2.4rem .5rem 2.2rem",
-                    background: "var(--nw-inset)",
-                    border: "1px solid var(--nw-border)",
-                    borderRadius: "var(--nw-radius)", color: "var(--nw-text)",
-                    fontSize: ".8rem", outline: "none",
-                    boxSizing: "border-box",
-                  }}
+                  className="login-input password-input"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(v => !v)}
-                  style={{
-                    position: "absolute", right: 10, top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none", border: "none", padding: 4, cursor: "pointer",
-                    color: "var(--nw-muted)",
-                  }}
+                  className="password-toggle"
                 >
                   {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
@@ -173,8 +106,7 @@ export default function Login({ onLoginSuccess }) {
             <button
               type="submit"
               disabled={loading}
-              className="btn btn-primary w-100"
-              style={{ padding: ".6rem" }}
+              className="btn btn-primary w-100 login-submit"
             >
               {loading ? "Перевірка..." : "Увійти"}
             </button>
@@ -182,10 +114,7 @@ export default function Login({ onLoginSuccess }) {
         </div>
 
         {/* Footer */}
-        <p style={{
-          textAlign: "center", marginTop: "1.25rem",
-          fontSize: ".6rem", color: "var(--nw-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em"
-        }}>
+        <p className="login-footer">
         </p>
       </div>
     </div>

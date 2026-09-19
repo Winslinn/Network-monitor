@@ -267,92 +267,46 @@ function MainLayout({ setIsAuth }) {
       {icon}
       {label}
       {badge > 0 && (
-        <Badge bg="danger" pill className="ms-auto" style={{ fontSize: ".58rem" }}>{badge}</Badge>
+        <Badge bg="danger" pill className="ms-auto nav-badge">{badge}</Badge>
       )}
     </Nav.Link>
   );
 
   return (
-    <div style={{ background: "var(--nw-bg)", minHeight: "100vh", color: "var(--nw-text)" }}>
+    <div className="app-shell">
       <Toasts toasts={toasts} />
 
       {/* Top bar */}
-      <nav style={{
-        position: "sticky", top: 0, zIndex: 100,
-        background: "var(--nw-surface)",
-        borderBottom: "1px solid var(--nw-border)",
-        display: "flex", alignItems: "center",
-        padding: "0 1.25rem", gap: "1rem", height: 48,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 900, fontSize: ".85rem", letterSpacing: "0.02em" }}>
+      <nav className="topbar">
+        <div className="brand">
           <Shield size={16} color="var(--nw-accent)" />
-          <span style={{ color: "var(--nw-text)" }}>NetWatch</span>
+          <span>NetWatch</span>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="topbar-actions">
           {/* WS badge */}
-          <span style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "3px 12px",
-            fontSize: ".65rem", fontWeight: 700, letterSpacing: ".02em",
-            background: "var(--nw-inset)",
-            border: "1px solid var(--nw-border)",
-            borderRadius: 99,
-            color: wsStatus === "ok"
-              ? "var(--nw-success)"
-              : wsStatus === "reconnecting"
-                ? "var(--nw-warning)"
-                : "var(--nw-danger)",
-          }}>
-            <span style={{
-              width: 5, height: 5, borderRadius: "50%",
-              background: wsStatus === "ok" ? "var(--nw-success)" : wsStatus === "reconnecting" ? "var(--nw-warning)" : "var(--nw-danger)",
-              boxShadow: wsStatus === "ok" ? "0 0 6px var(--nw-success)" : "none",
-            }} />
+          <span className={`connection-status status-${wsStatus}`}>
+            <span className="status-dot" />
             {STATUS_LABEL[wsStatus]}
           </span>
 
           {/* Uptime */}
-          {routerInfo.uptime && (
-            <span className="font-monospace" style={{
-              fontSize: ".65rem", color: "var(--nw-muted)",
-              fontWeight: 600,
-            }}>
-              UPTIME: {routerInfo.uptime}
-            </span>
-          )}
+          {routerInfo.uptime && <span className="font-monospace uptime">UPTIME: {routerInfo.uptime}</span>}
 
           {/* Logout */}
           <button
             onClick={handleLogout}
-            style={{
-              background: "none", border: "none", cursor: "pointer", padding: 4,
-              color: "var(--nw-muted)", lineHeight: 0,
-            }}
+            className="logout-button"
             title="Вийти"
-            onMouseEnter={e => e.currentTarget.style.color = "var(--nw-danger)"}
-            onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
           >
             <LogOut size={14} />
           </button>
         </div>
       </nav>
 
-      <div style={{ display: "flex" }}>
+      <div className="app-body">
         {/* Sidebar */}
-        <aside
-          className="flex-column"
-          style={{
-            width: 200, flexShrink: 0,
-            background: "var(--nw-inset)",
-            borderRight: "1px solid var(--nw-border)",
-            position: "sticky", top: 48,
-            height: "calc(100vh - 48px)",
-            padding: "1rem 0.5rem",
-            overflowY: "auto",
-            display: "flex",
-          }}
-        >
+        <aside className="sidebar flex-column">
           <Nav variant="pills" className="flex-column gap-1">
             <NavItem id="dashboard" icon={<LayoutDashboard size={14} />} label="Дашборд" />
             <NavItem id="alerts" icon={<Bell size={14} />} label="Події" badge={unreadAlerts} />
@@ -361,35 +315,24 @@ function MainLayout({ setIsAuth }) {
         </aside>
 
         {/* Content */}
-        <main style={{ flex: 1, padding: "1.5rem", minWidth: 0 }}>
-          <header style={{ marginBottom: "1.25rem", borderBottom: "1px solid var(--nw-border)", paddingBottom: "1rem" }}>
-            <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em", textTransform: "uppercase" }}>
+        <main className="app-main">
+          <header className="page-header">
+            <h2 className="page-title">
               {PAGE[tab].title}
             </h2>
-            <p style={{ margin: "2px 0 0", fontSize: ".7rem", color: "var(--nw-muted)", textTransform: "uppercase", fontWeight: 600 }}>
+            <p className="page-subtitle">
               {PAGE[tab].sub}
             </p>
           </header>
 
           {/* Reconnect banner */}
           {wsStatus !== "ok" && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: ".5rem 0.75rem", marginBottom: "1rem",
-              background: "rgba(244,63,94,0.05)",
-              border: `1px solid var(--nw-danger)`,
-            }}>
+            <div className="reconnect-banner">
               <Spinner
                 animation="border" size="sm"
-                style={{
-                  width: 12, height: 12, borderWidth: 2,
-                  color: "var(--nw-danger)",
-                }}
+                className="reconnect-spinner"
               />
-              <span style={{
-                fontSize: ".7rem", fontWeight: 800, textTransform: "uppercase",
-                color: "var(--nw-danger)",
-              }}>
+              <span className="reconnect-text">
                 {wsStatus === "reconnecting" ? "Перепідключення до сервера…" : "Втрачено зв'язок з сервером"}
               </span>
             </div>
@@ -446,11 +389,8 @@ export default function App() {
 
   if (authChecking) {
     return (
-      <div style={{
-        minHeight: "100vh", background: "var(--nw-bg)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <Spinner animation="border" style={{ color: "var(--nw-accent)", width: 32, height: 32, borderWidth: 3 }} />
+      <div className="auth-loading">
+        <Spinner animation="border" className="auth-spinner" />
       </div>
     );
   }

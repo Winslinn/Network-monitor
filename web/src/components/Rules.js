@@ -1,4 +1,4 @@
-import { Row, Col, Stack, Form } from "react-bootstrap";
+import { Row, Col, Stack } from "react-bootstrap";
 import { Plus, X, Save, ToggleLeft, ToggleRight } from "lucide-react";
 
 const SEVERITY = {
@@ -10,10 +10,7 @@ const SEVERITY = {
 
 function FieldLabel({ children }) {
   return (
-    <div style={{
-      fontSize: ".65rem", fontWeight: 800,
-      letterSpacing: ".08em", color: "var(--nw-muted)", marginBottom: 6,
-    }}>
+    <div className="field-label">
       {children}
     </div>
   );
@@ -24,13 +21,7 @@ function NwInput({ as, rows, ...props }) {
   return (
     <Tag
       rows={rows}
-      style={{
-        width: "100%", padding: ".5rem .75rem",
-        background: "var(--nw-bg)", border: "1px solid var(--nw-border)",
-        borderRadius: "var(--nw-radius)", color: "var(--nw-text)", fontSize: ".8rem",
-        outline: "none", resize: "vertical", boxSizing: "border-box",
-        fontFamily: Tag === "textarea" ? "inherit" : undefined,
-      }}
+      className={`nw-input ${Tag === "textarea" ? "nw-textarea" : ""}`}
       {...props}
     />
   );
@@ -39,16 +30,7 @@ function NwInput({ as, rows, ...props }) {
 function NwSelect({ children, ...props }) {
   return (
     <select
-      style={{
-        width: "100%", padding: ".5rem .75rem",
-        background: "var(--nw-bg)", border: "1px solid var(--nw-border)",
-        borderRadius: "var(--nw-radius)", color: "var(--nw-text)", fontSize: ".8rem",
-        outline: "none", boxSizing: "border-box", cursor: "pointer",
-        appearance: "none",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234e6580' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "right 10px center",
-      }}
+      className="nw-select"
       {...props}
     >
       {children}
@@ -71,48 +53,31 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
   };
 
   return (
-    <div style={{
-      background: "var(--nw-surface)",
-      border: "1px solid var(--nw-border)",
-      borderRadius: "var(--nw-radius)",
-    }}>
+    <div className="nw-panel">
       {/* Header */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0.85rem 1rem",
-        borderBottom: "1px solid var(--nw-border)",
-        background: "var(--nw-inset)",
-      }}>
+      <div className="nw-panel-header">
         <div>
-          <h5 style={{ margin: 0, fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.05em" }}>Правила виявлення</h5>
-          <p style={{ margin: "2px 0 0", fontSize: ".65rem", color: "var(--nw-muted)", fontWeight: 600 }}>
+          <h5 className="panel-title">Правила виявлення</h5>
+          <p className="panel-subtitle">
             {rules.length} активних конфігурацій
           </p>
         </div>
         {!showAddRule && (
           <button
             onClick={() => setShowAddRule(true)}
-            className="btn btn-primary"
-            style={{ padding: "4px 12px" }}
+            className="btn btn-primary compact-button add-rule-button"
           >
-            <Plus size={14} style={{ marginRight: 6 }} />
+            <Plus size={14} className="button-icon" />
             Додати
           </button>
         )}
       </div>
 
-      <div style={{ padding: "1rem" }}>
+      <div className="nw-panel-body">
         {/* Add rule form */}
         {showAddRule && (
-          <div style={{
-            background: "var(--nw-inset)", border: "1px solid var(--nw-border)",
-            borderRadius: "var(--nw-radius)", padding: "1rem", marginBottom: "1rem",
-          }}>
-            <div style={{
-              fontSize: ".6rem", fontWeight: 900,
-              letterSpacing: ".1em", color: "var(--nw-muted)", marginBottom: "1rem",
-              borderBottom: "1px solid var(--nw-border)", paddingBottom: "0.5rem"
-            }}>
+          <div className="rule-form-panel">
+            <div className="rule-form-title">
               Створення нового правила
             </div>
 
@@ -167,7 +132,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                   placeholder="IP, маска або регулярний вираз…"
                   value={newRule.pattern}
                   onChange={e => setNewRule({ ...newRule, pattern: e.target.value })}
-                  style={{ fontFamily: "JetBrains Mono, monospace" }}
+                  className="font-monospace"
                 />
               </div>
 
@@ -184,14 +149,13 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
               </div>
 
               {/* Actions */}
-              <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
+              <div className="form-actions">
                 <button
                   onClick={handleAddRule}
                   disabled={!newRule.name.trim()}
-                  className="btn btn-primary"
-                  style={{ padding: "4px 16px" }}
+                  className="btn btn-primary compact-button save-button"
                 >
-                  <Save size={14} style={{ marginRight: 6 }} />
+                  <Save size={14} className="button-icon" />
                   Зберегти
                 </button>
                 <button
@@ -199,8 +163,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                     setShowAddRule(false);
                     setNewRule({ name: "", type: "custom", severity: "medium", description: "", pattern: "" });
                   }}
-                  className="btn btn-outline-secondary"
-                  style={{ padding: "4px 12px" }}
+                  className="btn btn-outline-secondary compact-button"
                 >
                   Скасувати
                 </button>
@@ -211,38 +174,22 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
 
         {/* Rules list */}
         {rules.length === 0 ? (
-          <div style={{
-            textAlign: "center", padding: "2rem 1rem",
-            color: "var(--nw-muted)", border: "1px dashed var(--nw-border)",
-            fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em"
-          }}>
+          <div className="empty-state empty-rules-state">
             Список правил порожній
           </div>
         ) : (
-          <div style={{
-            border: "1px solid var(--nw-border)",
-            borderRadius: "var(--nw-radius)", overflow: "hidden",
-          }}>
+          <div className="rules-list">
             {rules.map((rule, idx) => {
               const sev = SEVERITY[rule.severity?.toLowerCase()];
               return (
                 <div
                   key={rule.id}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 14,
-                    padding: ".65rem 1rem",
-                    borderBottom: idx < rules.length - 1 ? "1px solid var(--nw-border)" : "none",
-                    background: rule.is_enabled ? "transparent" : "rgba(0,0,0,0.02)",
-                  }}
+                  className={`rule-row ${rule.is_enabled ? "enabled" : "disabled"} ${idx < rules.length - 1 ? "has-divider" : ""}`}
                 >
                   {/* Enable toggle */}
                   <button
                     onClick={() => handleToggle(rule)}
-                    style={{
-                      background: "none", border: "none", padding: 0,
-                      cursor: "pointer", flexShrink: 0, lineHeight: 0,
-                      color: rule.is_enabled ? "var(--nw-success)" : "var(--nw-muted)",
-                    }}
+                    className={`rule-toggle ${rule.is_enabled ? "enabled" : "disabled"}`}
                   >
                     {rule.is_enabled
                       ? <ToggleRight size={20} />
@@ -251,38 +198,24 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                   </button>
 
                   {/* Info */}
-                  <div style={{ flexGrow: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: ".8rem", fontWeight: 700, color: rule.is_enabled ? "var(--nw-text)" : "var(--nw-muted)" }}>
+                  <div className="rule-info">
+                    <div className="rule-name">
                       {rule.name}
                     </div>
-                    <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", marginTop: 2 }}>
+                    <div className="font-monospace rule-meta">
                       {availableDetectors[rule.type] || rule.type} | ID: {String(rule.id).slice(0, 8)}
                     </div>
                   </div>
 
                   {/* Severity badge */}
-                  <span style={{
-                    fontSize: ".6rem", fontWeight: 800,
-                    letterSpacing: ".05em", padding: "2px 8px",
-                    border: `1px solid ${sev?.color || "var(--nw-muted)"}40`,
-                    color: sev?.color || "var(--nw-muted)",
-                    background: `${sev?.color || "var(--nw-muted)"}08`,
-                    whiteSpace: "nowrap",
-                    borderRadius: "var(--nw-radius)",
-                  }}>
+                  <span className={`rule-severity severity-${rule.severity?.toLowerCase()}`}>
                     {sev?.label || rule.severity}
                   </span>
 
                   {/* Delete */}
                   <button
                     onClick={() => handleDelete(rule)}
-                    style={{
-                      background: "none", border: "none", padding: 4,
-                      cursor: "pointer", flexShrink: 0, lineHeight: 0,
-                      color: "var(--nw-muted)",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = "var(--nw-danger)"}
-                    onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
+                    className="delete-button"
                   >
                     <X size={15} />
                   </button>
