@@ -6,31 +6,18 @@ import { Navbar, Nav, Row, Col, Badge, Alert, Button, Spinner, Stack } from "rea
 import { Shield, LayoutDashboard, Bell, LogOut } from "lucide-react";
 
 import "./App.css";
-import Toasts    from "./components/Toasts";
-import Alerts    from "./components/Alerts";
+import Toasts from "./components/Toasts";
+import Alerts from "./components/Alerts";
 import DHCPTable from "./components/DHCPTable";
 import Dashboard from "./components/Dashboard";
-import Rules     from "./components/Rules";
-import Terminal  from "./components/Terminal";
-import Login     from "./components/Login";
+import Rules from "./components/Rules";
+import Terminal from "./components/Terminal";
+import Login from "./components/Login";
 
-const API_BASE      = "https://potyshyi-server:8443";
-const WS_URL        = "wss://potyshyi-server:8443/api/ws";
-const RECONNECT_MS  = 3001;
+export const API_BASE = "https://potyshyi-server:8443";
+const WS_URL = "wss://potyshyi-server:8443/api/ws";
+const RECONNECT_MS = 3001;
 const PING_INTERVAL = 20000;
-
-export const TYPE_LABELS = {
-  port_scan:     "Сканування портів",
-  brute_force:   "Брутфорс",
-  syn_flood:     "SYN-флуд",
-  icmp_flood:    "ICMP-флуд",
-  ddos_flood:    "DDoS-флуд",
-  dns_anomaly:   "DNS-аномалія",
-  large_packet:  "Великий пакет",
-  telnet_access: "Telnet-доступ",
-  config_change: "Зміна конфігурації",
-  custom:        "Власне правило",
-};
 
 export function fmtDate(iso) {
   try {
@@ -40,9 +27,9 @@ export function fmtDate(iso) {
 }
 
 const PAGE = {
-  dashboard: { title: "Дашборд",  sub: "Огляд мережі та системи" },
-  alerts:    { title: "Події",    sub: "Журнал безпеки та сповіщень" },
-  rules:     { title: "Правила",  sub: "Управління правилами виявлення" },
+  dashboard: { title: "Дашборд", sub: "Огляд мережі та системи" },
+  alerts: { title: "Події", sub: "Журнал безпеки та сповіщень" },
+  rules: { title: "Правила", sub: "Управління правилами виявлення" },
 };
 
 const STATUS_LABEL = {
@@ -52,9 +39,9 @@ const STATUS_LABEL = {
 // ── Main layout (authenticated) ───────────────────────────────────────────
 function MainLayout({ setIsAuth }) {
   const navigate = useNavigate();
-  const [tab, setTab]           = useState("dashboard");
+  const [tab, setTab] = useState("dashboard");
   const [wsStatus, setWsStatus] = useState("connecting");
-  const wsRef    = useRef(null);
+  const wsRef = useRef(null);
   const pingTimer = useRef(null);
 
   const [routerInfo, setRouterInfo] = useState({
@@ -63,22 +50,24 @@ function MainLayout({ setIsAuth }) {
     downloadSpeed: "—", uploadSpeed: "—", uptime: null,
   });
 
-  const [clients, setClients]           = useState([]);
-  const [search, setSearch]             = useState("");
-  const [alerts, setAlerts]             = useState([]);
-  const [alertFilter, setAlertFilter]   = useState("all");
+  const [clients, setClients] = useState([]);
+  const [search, setSearch] = useState("");
+  const [alerts, setAlerts] = useState([]);
+  const [alertFilter, setAlertFilter] = useState("all");
   const [unreadAlerts, setUnreadAlerts] = useState(0);
-  const [rules, setRules]               = useState([]);
-  const [showAddRule, setShowAddRule]   = useState(false);
-  const [newRule, setNewRule]           = useState({
-    name: "", type: "custom", severity: "medium", description: "", pattern: "",
+  const [rules, setRules] = useState([]);
+  const [availableDetectors, setAvailableDetectors] = useState({});
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [newRule, setNewRule] = useState({
+    name: "", type: "pattern", severity: "medium", description: "", pattern: "",
   });
-  const [logs, setLogs]               = useState([]);
-  const [packets, setPackets]         = useState({});
-  const packetsRef                    = useRef({});
+  const addingRuleRef = useRef(false);
+  const [logs, setLogs] = useState([]);
+  const [packets, setPackets] = useState({});
+  const packetsRef = useRef({});
   const [sessionOrder, setSessionOrder] = useState([]);
-  const [toasts, setToasts]           = useState([]);
-  const logsContainerRef              = useRef(null);
+  const [toasts, setToasts] = useState([]);
+  const logsContainerRef = useRef(null);
 
   const addToast = useCallback((message, severity = "medium") => {
     const id = Date.now() + Math.random();
@@ -86,47 +75,40 @@ function MainLayout({ setIsAuth }) {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4200);
   }, []);
 
-  const wsSend = (p) => wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(p));
-
-  const handleAddRule = useCallback(() => {
-    if (!newRule.name.trim()) return;
-    wsSend({ action: "add_rule", rule: newRule });
-    setNewRule({ name: "", type: "custom", severity: "medium", description: "", pattern: "" });
-    setShowAddRule(false);
-  }, [newRule]);
+  const handleAddRule = useCallback(async () => {
+    if (!newRule.name.trim() || addingRuleRef.current) return;
+    addingRuleRef.current = true;
+    try {
+      const response = await fetch(`${API_BASE}/api/rules`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRule),
+      });
+      if (!response.ok) {
+        addToast("Не вдалося додати правило", "high");
+        return;
+      }
+      const created = await response.json();
+      setRules(prev => prev.some(rule => rule.id === created.id) ? prev : [...prev, created]);
+      addToast(`Правило додано: ${created.name}`, "low");
+      setNewRule({ name: "", type: "custom", severity: "medium", description: "", pattern: "" });
+      setShowAddRule(false);
+    } finally {
+      addingRuleRef.current = false;
+    }
+  }, [newRule, addToast]);
 
   const handleMessage = useCallback((msg) => {
     const ctx = msg.context;
-    if (ctx === "initial") {
-      const r = msg.router || {};
-      setClients(msg.dhcp || []);
-      setRouterInfo(prev => ({
-        ...prev,
-        hostname:      r.device_name     || prev.hostname,
-        ip:            r.ip_address      || "—",
-        mac:           r.mac_address     || "—",
-        cpuUsage:      r.cpuUsage        ?? prev.cpuUsage,
-        ramUsage:      r.ramUsage        ?? prev.ramUsage,
-        downloadSpeed: r.downloadSpeed   || prev.downloadSpeed,
-        uploadSpeed:   r.uploadSpeed     || prev.uploadSpeed,
-        uptime:        r.uptime          || null,
-      }));
-      if (msg.logs)
-        setLogs(msg.logs.map(l => ({
-          ...l,
-          timestamp: l.timestamp || new Date().toISOString(),
-          id: Math.random().toString(36).slice(2),
-        })));
-    }
-    else if (ctx === "stats")  setRouterInfo(prev => ({ ...prev, ...msg }));
-    else if (ctx === "log")    setLogs(prev => [...prev.slice(-199), {
+    if (ctx === "stats") setRouterInfo(prev => ({ ...prev, ...msg }));
+    else if (ctx === "log") setLogs(prev => [...prev.slice(-199), {
       ...msg.data, timestamp: new Date().toISOString(), id: Date.now() + Math.random(),
     }]);
-    else if (ctx === "dhcp")   setClients(prev => {
+    else if (ctx === "dhcp") setClients(prev => {
       const exists = prev.find(c => c.id === msg.data.id);
       return exists ? prev.map(c => c.id === msg.data.id ? msg.data : c) : [...prev, msg.data];
     });
-    else if (ctx === "flows")  {
+    else if (ctx === "flows") {
       const delta = msg.data || {};
       if (!Object.keys(delta).length) return;
       packetsRef.current = { ...packetsRef.current };
@@ -145,11 +127,11 @@ function MainLayout({ setIsAuth }) {
       setPackets({ ...packetsRef.current });
       if (newKeys.length) setSessionOrder(prev => [...newKeys, ...prev]);
     }
-    else if (ctx === "alert")  {
+    else if (ctx === "alert") {
       setAlerts(prev => {
         const data = msg.data || {};
         const exists = prev.find(a => a.id === data.id);
-        
+
         if (exists) {
           // Оновлюємо існуючу подію
           return prev.map(a => a.id === data.id ? { ...data, _received: Date.now() } : a);
@@ -157,10 +139,10 @@ function MainLayout({ setIsAuth }) {
           // Це нова подія
           setUnreadAlerts(v => v + 1);
           addToast(
-            `${TYPE_LABELS[data.type] || data.type}: ${data.description?.slice(0, 60)}`,
+            `${data.type}: ${data.description?.slice(0, 60)}`,
             data.severity,
           );
-          
+
           return [{
             ...data,
             _id: Date.now() + Math.random(),
@@ -169,11 +151,9 @@ function MainLayout({ setIsAuth }) {
         }
       });
     }
-    else if (ctx === "rules_list") setRules(msg.data || []);
-    else if (ctx === "rule_added" && msg.rule) {
-      setRules(prev => [...prev, msg.rule]);
-      addToast(`Правило додано: ${msg.rule.name}`, "low");
-    }
+    else if (ctx === "rule_created" && msg.data) setRules(prev => prev.some(r => r.id === msg.data.id) ? prev : [...prev, msg.data]);
+    else if (ctx === "rule_updated" && msg.data) setRules(prev => prev.map(r => r.id === msg.data.id ? msg.data : r));
+    else if (ctx === "rule_deleted" && msg.data) setRules(prev => prev.filter(r => r.id !== msg.data.id));
   }, [addToast]);
 
   const connect = useCallback(() => {
@@ -187,7 +167,6 @@ function MainLayout({ setIsAuth }) {
         () => ws.readyState === 1 && ws.send(JSON.stringify({ action: "ping" })),
         PING_INTERVAL,
       );
-      ws.send(JSON.stringify({ action: "get_rules" }));
     };
     ws.onmessage = e => handleMessage(JSON.parse(e.data));
     ws.onclose = e => {
@@ -206,6 +185,59 @@ function MainLayout({ setIsAuth }) {
     connect();
     return () => { clearInterval(pingTimer.current); wsRef.current?.close(); };
   }, [connect]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch(`${API_BASE}/api/bootstrap`, { credentials: "include" }),
+      fetch(`${API_BASE}/api/alerts`, { credentials: "include" }),
+      fetch(`${API_BASE}/api/flows`, { credentials: "include" }),
+    ]).then(async ([bootstrapResponse, alertsResponse, flowsResponse]) => {
+      if (bootstrapResponse.status === 401) {
+        setIsAuth(false);
+        navigate("/login");
+        return;
+      }
+      const bootstrap = await bootstrapResponse.json();
+      const history = alertsResponse.ok ? await alertsResponse.json() : [];
+      const storedFlows = flowsResponse.ok ? await flowsResponse.json() : [];
+      if (cancelled) return;
+      const r = bootstrap.router || {};
+      setClients(bootstrap.dhcp || []);
+      setRules(bootstrap.rules || []);
+      setRouterInfo(prev => ({ ...prev, hostname: r.device_name || prev.hostname, ip: r.ip_address || "—", mac: r.mac_address || "—", dns: r.dns_server || "—" }));
+      setAlerts(history || []);
+      const detectors = bootstrap.available_detectors || {};
+      setAvailableDetectors({
+        ...Object.fromEntries(Object.entries(detectors).map(([k, d]) => [d.ID, d.TYPE]))
+      });
+
+      const initialPackets = {};
+      const initialOrder = [];
+      (storedFlows || []).forEach(flow => {
+        const key = flow.flow_id || String(flow.id);
+        if (!key) return;
+        initialPackets[key] = {
+          flow_id: flow.flow_id,
+          src: flow.src || flow.src_ip,
+          dst: flow.dst || flow.dst_ip,
+          protocol: flow.protocol,
+          ports: flow.ports || {},
+          flags: flow.flags || {},
+          count: flow.packet_count || 0,
+          uniqueId: Math.random().toString(36).slice(2),
+        };
+        initialOrder.push(key);
+      });
+      packetsRef.current = { ...initialPackets, ...packetsRef.current };
+      setPackets(prev => ({ ...initialPackets, ...prev }));
+      setSessionOrder(prev => [
+        ...initialOrder.filter(key => !prev.includes(key)),
+        ...prev,
+      ]);
+    }).catch(() => addToast("Не вдалося завантажити початкові дані", "high"));
+    return () => { cancelled = true; };
+  }, [addToast, navigate, setIsAuth]);
 
   useEffect(() => { if (tab === "alerts") setUnreadAlerts(0); }, [tab]);
 
@@ -323,8 +355,8 @@ function MainLayout({ setIsAuth }) {
         >
           <Nav variant="pills" className="flex-column gap-1">
             <NavItem id="dashboard" icon={<LayoutDashboard size={14} />} label="Дашборд" />
-            <NavItem id="alerts"    icon={<Bell size={14} />}            label="Події" badge={unreadAlerts} />
-            <NavItem id="rules"     icon={<Shield size={14} />}          label="Правила" />
+            <NavItem id="alerts" icon={<Bell size={14} />} label="Події" badge={unreadAlerts} />
+            <NavItem id="rules" icon={<Shield size={14} />} label="Правила" />
           </Nav>
         </aside>
 
@@ -381,6 +413,7 @@ function MainLayout({ setIsAuth }) {
                 alerts={alerts} alertFilter={alertFilter}
                 setAlertFilter={setAlertFilter} setAlerts={setAlerts}
                 fmtDate={fmtDate}
+                availableDetectors={availableDetectors}
               />
             )}
             {tab === "rules" && (
@@ -388,7 +421,8 @@ function MainLayout({ setIsAuth }) {
                 rules={rules} showAddRule={showAddRule}
                 setShowAddRule={setShowAddRule} newRule={newRule}
                 setNewRule={setNewRule} handleAddRule={handleAddRule}
-                wsSend={p => wsSend(p)}
+                apiBase={API_BASE}
+                availableDetectors={availableDetectors}
               />
             )}
           </div>
@@ -400,11 +434,11 @@ function MainLayout({ setIsAuth }) {
 
 // ── Root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [isAuth, setIsAuth]           = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/me`, { credentials: "include" })
+    fetch(`${API_BASE}/api/session`, { credentials: "include" })
       .then(r => setIsAuth(r.ok))
       .catch(() => setIsAuth(false))
       .finally(() => setAuthChecking(false));

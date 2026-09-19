@@ -19,3 +19,6 @@ def load_detectors() -> list:
     return detectors
 
 DETECTORS = load_detectors()
+
+def get_detectors():
+    return DETECTORS

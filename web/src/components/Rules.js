@@ -1,24 +1,11 @@
 import { Row, Col, Stack, Form } from "react-bootstrap";
 import { Plus, X, Save, ToggleLeft, ToggleRight } from "lucide-react";
 
-const RULE_TYPES = {
-  port_scan:     "Сканування портів",
-  brute_force:   "Брутфорс",
-  syn_flood:     "SYN-флуд",
-  icmp_flood:    "ICMP-флуд",
-  ddos_flood:    "DDoS-флуд",
-  dns_anomaly:   "DNS-аномалія",
-  large_packet:  "Великий пакет",
-  telnet_access: "Telnet-доступ",
-  config_change: "Зміна конфігурації",
-  custom:        "Власне правило",
-};
-
 const SEVERITY = {
-  critical: { color: "var(--nw-danger)",   label: "Критичний" },
-  high:     { color: "var(--nw-danger)",   label: "Високий" },
-  medium:   { color: "var(--nw-warning)",  label: "Середній" },
-  low:      { color: "var(--nw-info)",     label: "Низький" },
+  critical: { color: "var(--nw-danger)", label: "Критичний" },
+  high: { color: "var(--nw-danger)", label: "Високий" },
+  medium: { color: "var(--nw-warning)", label: "Середній" },
+  low: { color: "var(--nw-info)", label: "Низький" },
 };
 
 function FieldLabel({ children }) {
@@ -69,14 +56,18 @@ function NwSelect({ children, ...props }) {
   );
 }
 
-export default function Rules({ rules, showAddRule, setShowAddRule, newRule, setNewRule, handleAddRule, wsSend }) {
-  const handleDelete = (rule) => {
+export default function Rules({ rules, showAddRule, setShowAddRule, newRule, setNewRule, handleAddRule, apiBase, availableDetectors }) {
+  const handleDelete = async (rule) => {
     if (!window.confirm(`Видалити правило «${rule.name}»?`)) return;
-    wsSend({ action: "delete_rule", rule_id: rule.id });
+    await fetch(`${apiBase}/api/rules/${rule.id}`, { method: "DELETE", credentials: "include" });
   };
 
-  const handleToggle = (rule) => {
-    wsSend({ action: "toggle_rule", rule_id: rule.id, enabled: !rule.is_enabled });
+  const handleToggle = async (rule) => {
+    await fetch(`${apiBase}/api/rules/${rule.id}`, {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_enabled: !rule.is_enabled }),
+    });
   };
 
   return (
@@ -145,9 +136,14 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                     value={newRule.type}
                     onChange={e => setNewRule({ ...newRule, type: e.target.value })}
                   >
-                    {Object.entries(RULE_TYPES).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
+                    <optgroup label="Доступні модулі">
+                      {Object.entries(availableDetectors).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Власні правила">
+                      <option value="pattern">Патерн</option>
+                    </optgroup>
                   </NwSelect>
                 </Col>
                 <Col sm={6}>
@@ -260,7 +256,7 @@ export default function Rules({ rules, showAddRule, setShowAddRule, newRule, set
                       {rule.name}
                     </div>
                     <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", marginTop: 2 }}>
-                      {RULE_TYPES[rule.type] || rule.type} | ID: {String(rule.id).slice(0, 8)}
+                      {availableDetectors[rule.type] || rule.type} | ID: {String(rule.id).slice(0, 8)}
                     </div>
                   </div>
 

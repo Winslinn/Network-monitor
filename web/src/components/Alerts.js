@@ -1,18 +1,17 @@
 import { Button, Stack, Badge } from "react-bootstrap";
 import { Trash2, Bell } from "lucide-react";
 import { SEV_ICON } from "./Toasts";
-import { TYPE_LABELS } from "../App";
 
 const SEV_CONFIG = {
-  critical: { color: "var(--nw-danger)",  bg: "rgba(244,63,94,.07)",  border: "var(--nw-danger)",  label: "Критично" },
-  high:     { color: "var(--nw-danger)",  bg: "rgba(244,63,94,0)",  border: "var(--nw-danger)", label: "Високий" },
-  medium:   { color: "var(--nw-warning)", bg: "rgba(245,158,11,0)", border: "var(--nw-warning)", label: "Середній" },
-  low:      { color: "var(--nw-info)",    bg: "rgba(56,189,248,0)", border: "var(--nw-border)",  label: "Низький" },
+  critical: { color: "var(--nw-danger)", bg: "rgba(244,63,94,.07)", border: "var(--nw-danger)", label: "Критично" },
+  high: { color: "var(--nw-danger)", bg: "rgba(244,63,94,0)", border: "var(--nw-danger)", label: "Високий" },
+  medium: { color: "var(--nw-warning)", bg: "rgba(245,158,11,0)", border: "var(--nw-warning)", label: "Середній" },
+  low: { color: "var(--nw-info)", bg: "rgba(56,189,248,0)", border: "var(--nw-border)", label: "Низький" },
 };
 
 const FILTER_LABELS = { all: "Всі", low: "Низький", medium: "Середній", high: "Високий", critical: "Критично" };
 
-export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts, fmtDate }) {
+export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts, fmtDate, availableDetectors }) {
   const filtered = alerts.filter(a => alertFilter === "all" || a.severity?.toLowerCase() === alertFilter);
 
   const handleClear = () => {
@@ -109,7 +108,7 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: ".8rem", fontWeight: 800, color: "var(--nw-text)" }}>
-                          {TYPE_LABELS[a.type] || a.type}
+                          {availableDetectors[a.type] || a.type}
                         </span>
                         {a.count > 1 && (
                           <Badge bg="danger" style={{ fontSize: ".6rem", borderRadius: 4, padding: "2px 5px" }}>
@@ -132,14 +131,14 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                     <div className="font-monospace" style={{ fontSize: ".65rem", color: "var(--nw-muted)", opacity: .6, display: "flex", gap: 12 }}>
                       <span>{fmtDate(a.last_seen || a.timestamp)}</span>
                       {a.flow_id && (
-                        <span 
+                        <span
                           title="Натисніть, щоб скопіювати HASH"
                           onClick={() => {
                             navigator.clipboard.writeText(a.flow_id);
                           }}
-                          style={{ 
-                            cursor: "pointer", userSelect: "none", 
-                            color: "var(--nw-muted)" 
+                          style={{
+                            cursor: "pointer", userSelect: "none",
+                            color: "var(--nw-muted)"
                           }}
                           onMouseEnter={e => e.currentTarget.style.color = "var(--nw-accent)"}
                           onMouseLeave={e => e.currentTarget.style.color = "var(--nw-muted)"}
