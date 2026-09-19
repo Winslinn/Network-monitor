@@ -14,10 +14,14 @@ with open(f'{PROJECT_ROOT}/config.yaml', 'r') as f:
 class RouterManager:
     def __init__(self):
         try:
+            self.host = config['router']['ip']
+            self.username = config['router']['username']
+            self.password = config['router']['password']
+
             self.connection = connect(
-                host=config['router']['ip'],
-                username=config['router']['username'],
-                password=config['router']['password'],
+                host=self.host,
+                username=self.username,
+                password=self.password,
                 timeout=10
             )
             self.data = {}
@@ -41,7 +45,7 @@ class RouterManager:
                 host=self.host,
                 username=self.username,
                 password=self.password,
-                timeout=self.timeout
+                timeout=10
             )
         return self.connection
 
@@ -187,7 +191,7 @@ async def check_active_clients(manager):
 
             session.commit()
             if new_clients:
-                for _, client in new_clients:
+                for client in new_clients:
                     await manager.broadcast(
                         {
                             "context": "dhcp",
