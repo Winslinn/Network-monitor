@@ -314,6 +314,24 @@ def delete_rule(rule_id: int):
             session.commit()
 
 
+def update_rule(rule_id: int, rule_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    with Session() as session:
+        rule = session.get(Rule, rule_id)
+        if not rule:
+            return None
+        for field in ("name", "type", "severity", "description", "pattern", "is_enabled"):
+            if field in rule_data and rule_data[field] is not None:
+                setattr(rule, field, rule_data[field])
+        session.commit()
+        return rule.to_dict()
+
+
+def get_flows() -> List[Dict[str, Any]]:
+    with Session() as session:
+        flows = session.execute(sa.select(Flow).order_by(Flow.last_time.desc())).scalars().all()
+        return [f.to_dict() for f in flows]
+
+
 def get_all_alerts() -> List[Dict[str, Any]]:
     with Session() as session:
         alerts = session.execute(
