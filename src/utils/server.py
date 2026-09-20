@@ -267,6 +267,7 @@ async def websocket_endpoint(websocket: WebSocket, access_token: Optional[str] =
         pass
     finally:
         await manager.disconnect(websocket)
+        
 def run_websocket(flow_queue, result_queue):
     init_db()
     async def serve():

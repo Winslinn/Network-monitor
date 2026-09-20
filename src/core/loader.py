@@ -20,5 +20,5 @@ def load_detectors() -> list:
 
 DETECTORS = load_detectors()
 
-def get_detectors():
+def get_detectors() -> list:
     return DETECTORS
