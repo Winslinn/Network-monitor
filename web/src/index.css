@@ -8,7 +8,6 @@
   --nw-muted:      #64748b;
   --nw-accent:     #059669;
   --nw-accent-bg:  rgba(5, 150, 105, .10);
-  --nw-accent-dim: rgba(5, 150, 105, .06);
   --nw-success:    #10b981;
   --nw-warning:    #f59e0b;
   --nw-danger:     #ef4444;
@@ -43,20 +42,12 @@ body {
 }
 
 /* Text */
-.text-secondary { color: var(--nw-muted) !important; }
-.text-primary   { color: var(--nw-accent) !important; }
 .text-info      { color: var(--nw-info)   !important; }
-.text-success   { color: var(--nw-success)!important; }
 .text-warning   { color: var(--nw-warning)!important; }
 .text-danger    { color: var(--nw-danger) !important; }
 
 /* Backgrounds */
-.bg-primary  { background-color: var(--nw-accent)  !important; }
-.bg-success  { background-color: var(--nw-success) !important; }
-.bg-warning  { background-color: var(--nw-warning) !important; }
 .bg-danger   { background-color: var(--nw-danger)  !important; }
-.bg-info     { background-color: var(--nw-info)    !important; }
-.border-secondary { border-color: var(--nw-border) !important; }
 
 /* Buttons */
 .btn {
@@ -84,38 +75,6 @@ body {
 .btn-outline-danger {
   --bs-btn-color: var(--nw-danger);
   --bs-btn-border-color: var(--nw-danger);
-}
-
-/* Forms */
-.form-control, .form-select {
-  background-color: var(--nw-surface) !important;
-  border-color: var(--nw-border) !important;
-  color: var(--nw-text) !important;
-  border-radius: var(--nw-radius) !important;
-}
-.form-control:focus, .form-select:focus {
-  border-color: var(--nw-accent) !important;
-  box-shadow: none !important; /* No glow */
-}
-.form-control::placeholder { color: var(--nw-muted) !important; opacity: .5; }
-.form-select option { background-color: var(--nw-surface); }
-
-.input-group-text {
-  background-color: var(--nw-surface) !important;
-  border-color: var(--nw-border) !important;
-  color: var(--nw-muted) !important;
-  border-radius: var(--nw-radius) !important;
-}
-
-/* Progress */
-.progress { background-color: var(--nw-inset) !important; border-radius: 0 !important; }
-
-/* Table */
-.table-dark {
-  --bs-table-bg: transparent;
-  --bs-table-border-color: var(--nw-border);
-  --bs-table-hover-bg: var(--nw-accent-dim);
-  color: var(--nw-text) !important;
 }
 
 /* Toasts */
