@@ -1,12 +1,15 @@
 import sqlalchemy as sa
 import bcrypt
+
+from os import getenv
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker, DeclarativeBase, relationship, selectinload
 from sqlalchemy.inspection import inspect
 from sqlalchemy.dialects.sqlite import insert
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timedelta, timezone
 
-engine = sa.create_engine("sqlite:///network.db", echo=False)
+PROJECT_ROOT = getenv('PROJECT_ROOT')
+engine = sa.create_engine(f"sqlite:///{PROJECT_ROOT}/src/network.db", echo=False)
 Session = sessionmaker(bind=engine)
 
 class Base(DeclarativeBase):
@@ -215,9 +218,9 @@ def init_db():
             session.add(new_admin)
             session.commit()
 
-            print(" Use the following credentials to log in and change the password immediately: ")
-            print(f" Username: {username}")
-            print(f" Password: {password}")
+            print(" Use the following credentials to log in and change the password immediately: ", flush=True)
+            print(f" Username: {username}", flush=True)
+            print(f" Password: {password}", flush=True)
 
 
 def get_user(username: str) -> Optional[Dict[str, Any]]:
@@ -309,6 +312,24 @@ def delete_rule(rule_id: int):
         if rule:
             session.delete(rule)
             session.commit()
+
+
+def update_rule(rule_id: int, rule_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    with Session() as session:
+        rule = session.get(Rule, rule_id)
+        if not rule:
+            return None
+        for field in ("name", "type", "severity", "description", "pattern", "is_enabled"):
+            if field in rule_data and rule_data[field] is not None:
+                setattr(rule, field, rule_data[field])
+        session.commit()
+        return rule.to_dict()
+
+
+def get_flows() -> List[Dict[str, Any]]:
+    with Session() as session:
+        flows = session.execute(sa.select(Flow).order_by(Flow.last_time.desc())).scalars().all()
+        return [f.to_dict() for f in flows]
 
 
 def get_all_alerts() -> List[Dict[str, Any]]:

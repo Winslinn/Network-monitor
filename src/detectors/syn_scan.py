@@ -8,11 +8,14 @@ RST = 0x04
 SYN = 0x02
 RST_ACK = 0x14
 SYN_ACK = 0x12
-SEVERITY = 'medium'
-DESCRIPTION = "Потенційне сканування портів, використовується багато різних портів з відповідними прапорами"
 
 class SynScanDetector:
     def __init__(self):
+        self.ID = 'port_scan'
+        self.TYPE = 'Сканування портів'
+        self.SEVERITY = 'medium'
+        self.DESCRIPTION = "Забагато запитів сканування портів від одного хоста"
+
         self.MIN_PORTS = 5  
         self.RST_RATIO = 0.7
 
@@ -43,9 +46,9 @@ class SynScanDetector:
             and ports_per_sec >= 1
         ):
             return {
-                'type': 'Сканування портів',
-                'severity': SEVERITY,
-                'description': DESCRIPTION,
+                'type': self.TYPE,
+                'severity': self.SEVERITY,
+                'description': self.DESCRIPTION,
                 'flow_id': flow['flow_id'],
                 'src': flow['src'],
                 'dst': flow['dst'],

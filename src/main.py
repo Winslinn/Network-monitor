@@ -1,40 +1,33 @@
 import asyncio
-
+import signal
 from multiprocessing import Process, Queue
-from prompt_toolkit import PromptSession
-from prompt_toolkit.patch_stdout import patch_stdout
 
-from utils.logmanager import log_collector
 from utils.server import run_websocket
 from core.sniffer import packet_collector
 
-async def handle_input():
-    session = PromptSession(erase_when_done=True)
-    while True:
-        try:
-            with patch_stdout():
-                text = await session.prompt_async("> ")
-                if text.strip() == 'exit':
-                    break
-        except (EOFError, KeyboardInterrupt):
-            break
-
 async def main():
-    log_queue = Queue()
     result_queue = Queue()
     flow_queue = Queue()
 
     processes = [
-        Process(target=log_collector, args=(log_queue,), daemon=True),
-        Process(target=run_websocket, args=(log_queue, flow_queue, result_queue), daemon=True),
+        Process(target=run_websocket, args=(flow_queue, result_queue), daemon=True),
         Process(target=packet_collector, args=(result_queue, flow_queue), daemon=True)
     ]
 
     for proc in processes:
         proc.start()
-        
+
+    stop_event = asyncio.Event()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except NotImplementedError:
+            pass
+
     try:
-        await handle_input()
+        await stop_event.wait()
     finally:
         for process in processes:
             if process.is_alive():

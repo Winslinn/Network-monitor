@@ -13,21 +13,31 @@ with open(f'{PROJECT_ROOT}/config.yaml', 'r') as f:
 
 class RouterManager:
     def __init__(self):
-        self.connection = connect(
-            host=config['router']['ip'],
-            username='admin',
-            password='admin',
-            timeout=10
-        )
-        self.data = {}
-        
-        self._providers = {
-            'arp': self._fetch_arp,
-            'interfaces': self._fetch_interfaces,
-            'network_info': self._fetch_network_info,
-            'router_db': self._fetch_router_db,
-            'dhcp': self._fetch_dhcp
-        }
+        try:
+            self.host = config['router']['ip']
+            self.username = config['router']['username']
+            self.password = config['router']['password']
+
+            self.connection = connect(
+                host=self.host,
+                username=self.username,
+                password=self.password,
+                timeout=10
+            )
+            self.data = {}
+            
+            self._providers = {
+                'arp': self._fetch_arp,
+                'interfaces': self._fetch_interfaces,
+                'network_info': self._fetch_network_info,
+                'router_db': self._fetch_router_db,
+                'dhcp': self._fetch_dhcp
+            }
+        except Exception as e:
+            print(f"Error initializing RouterManager: {e}")
+            self.connection = None
+            self.data = {}
+            self._providers = {}
         
     def _get_connection(self):
         if self.connection is None:
@@ -35,7 +45,7 @@ class RouterManager:
                 host=self.host,
                 username=self.username,
                 password=self.password,
-                timeout=self.timeout
+                timeout=10
             )
         return self.connection
 
@@ -43,10 +53,14 @@ class RouterManager:
         self.connection = None
         
     def _fetch_arp(self):
-        self.data['arp'] = list(
-            self.connection.path('ip', 'arp')
-            .select('address', 'mac-address', 'interface', 'status')
-        )
+        try:
+            self.data['arp'] = list(
+                self.connection.path('ip', 'arp')
+                .select('address', 'mac-address', 'interface', 'status')
+            )
+        except Exception as e:
+            print(f"Error fetching ARP data: {e}")
+            self.data['arp'] = []
     
     def _fetch_dhcp(self):
         self.data['dhcp'] = list(
@@ -123,8 +137,8 @@ async def check_active_clients(manager):
         async with router_lock:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(
-                None, 
-                lambda: router_manager.fetch_data({'arp', 'dhcp'}
+                    None, 
+                    lambda: router_manager.fetch_data({'arp', 'dhcp'}
                 )
             )
 
@@ -139,22 +153,23 @@ async def check_active_clients(manager):
             db_clients = session.query(Client).all()
             clients_map = {c.mac: c for c in db_clients}
 
+            new_clients = []
+
             for lease in dhcp_clients:
                 mac = lease.get('mac-address')
                     
                 dhcp_status = lease.get('status')
                 arp_status = arp_map.get(mac)
-                if dhcp_status == 'bound' and arp_status in ['reachable', 'delay', 'stale']:
-                    status = 'active'
-                else:
-                    status = 'expired'
+                arp_status = 'reachable' if arp_status == 'delay' else arp_status
 
                 client = clients_map.get(mac)
                 if client:
-                    if client.status != status or client.ip != lease.get('address'):
-                        client.status = status
+                    if client.status != arp_status or client.ip != lease.get('address'):
+
+                        client.status = arp_status
                         client.ip = lease.get('address')
                         client.hostname = lease.get('host-name')
+
                         await manager.broadcast({
                                 "context": "dhcp", 
                                 "client_id": client.id, 
@@ -164,18 +179,27 @@ async def check_active_clients(manager):
                 else:
                     if dhcp_status == 'bound':
                         new_client = Client(
-                        mac=mac, 
-                        ip=lease.get('address'), 
-                        hostname=lease.get('host-name'), 
-                        status=status, 
-                        router_id=1
-                    )
-                    session.add(new_client)
-                    await manager.broadcast({
-                        "context": "dhcp", 
-                        "client_id": new_client.id, 
-                        "data": new_client.to_dict()})
+                            mac=mac, 
+                            ip=lease.get('address'), 
+                            hostname=lease.get('host-name'), 
+                            status=arp_status, 
+                            router_id=1
+                        )
+
+                        session.add(new_client)
+                        new_clients.append(new_client)
+
             session.commit()
+            if new_clients:
+                for client in new_clients:
+                    await manager.broadcast(
+                        {
+                            "context": "dhcp",
+                            "client_id": client.id,
+                            "data": client.to_dict()
+                        }
+                    )
+
         await asyncio.sleep(30)
     
 async def init(manager):
@@ -185,8 +209,8 @@ async def init(manager):
     async with router_lock:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
-            None, lambda: router_manager.fetch_data({'arp', 'dhcp'}, exception=True
-            )
+            None, 
+            lambda: router_manager.fetch_data({'arp', 'dhcp'}, exception=True)
         )
     
     asyncio.create_task(check_active_clients(manager))
@@ -237,7 +261,10 @@ async def init(manager):
             print(f"Error fetching interface speeds: {e}")
             router_manager.reset_connection()
         
-        stats = next((item for item in all_interfaces if item.get('type') == 'bridge'), None)
+        stats = next(
+            (item for item in all_interfaces if item.get('type') == 'bridge'),
+            None
+        )
         if stats:
             curr_in = int(stats.get('rx-byte'))
             curr_out = int(stats.get('tx-byte'))
