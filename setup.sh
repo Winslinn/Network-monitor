@@ -5,7 +5,7 @@ set -e
 INSTALL_DIR=/opt/netwatch
 
 sudo apt update
-sudo apt install -y nginx nodejs python3 python3-pip python3-venv
+sudo apt install -y nginx nodejs python3 python3-pip python3-venv npm
 
 python3 -m venv $INSTALL_DIR/venv
 $INSTALL_DIR/venv/bin/pip install -r $INSTALL_DIR/requirements.txt
