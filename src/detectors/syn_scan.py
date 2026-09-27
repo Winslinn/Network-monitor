@@ -16,8 +16,10 @@ class SynScanDetector:
         self.SEVERITY = 'medium'
         self.DESCRIPTION = "Забагато запитів сканування портів від одного хоста"
 
-        self.MIN_PORTS = 5  
-        self.RST_RATIO = 0.7
+        self.CONFIG = {
+            'min_ports': 5,
+            'rst_ratio': 0.7,
+        }
 
     def analyze(self, flow: dict) -> dict | None:
         if flow['protocol'] != 6:
@@ -32,15 +34,18 @@ class SynScanDetector:
 
         rst_ack_count = flags.get(RST_ACK, 0)
         syn_ack_count = flags.get(SYN_ACK, 0)
+        response_count = rst_ack_count + syn_ack_count
+        rst_ratio = rst_ack_count / response_count if response_count else 0
         duration = flow['last_time'] - flow['start_time']
         ports_per_sec = unique_ports / duration if duration > 0 else unique_ports
 
         if (
-            # 1. Перевіряємо, що опитано вже від 5 портів
-            unique_ports >= self.MIN_PORTS
+            # 1. Перевіряємо, що опитано достатньо портів
+            unique_ports >= self.CONFIG['min_ports']
             
-            # 2. Перевіряємо, що ми отримали відповіді (або закриті, або відкриті порти)
-            and (rst_ack_count > 0 or syn_ack_count > 0)
+            # 2. Частка RST-ACK серед SYN-ACK і RST-ACK відповідей досягає порога
+            and response_count > 0
+            and rst_ratio >= self.CONFIG['rst_ratio']
             
             # 3. Швидкість перебору портів
             and ports_per_sec >= 1

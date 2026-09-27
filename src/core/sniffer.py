@@ -2,7 +2,8 @@ import socket, time, zlib
 
 from collections import Counter
 from multiprocessing import Queue
-from core.loader import DETECTORS
+import utils.database as db
+from core.loader import create_detector_instance
         
 def get_service_port(sport, dport):
     if dport >= 49152 and sport < 49152:
@@ -32,6 +33,10 @@ def packet_collector(result_queue: Queue, flow_queue: Queue):
     dirty = set()
     last_push = time.time()
     push_interval = 1
+    rules_refresh_interval = 2
+    next_rules_refresh = 0
+    loaded_rules = None
+    active_detectors = []
     
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind((listen_ip, listen_port))
@@ -42,6 +47,29 @@ def packet_collector(result_queue: Queue, flow_queue: Queue):
 
     while True:
         try:
+            now = time.monotonic()
+            if now >= next_rules_refresh:
+                next_rules_refresh = now + rules_refresh_interval
+                try:
+                    rules = db.get_enabled_detector_rules()
+                    if rules != loaded_rules:
+                        updated_detectors = []
+                        for rule in rules:
+                            try:
+                                detector = create_detector_instance(
+                                    rule['detector_id'], rule.get('config')
+                                )
+                                detector.SEVERITY = rule.get('severity') or detector.SEVERITY
+                                if rule.get('description'):
+                                    detector.DESCRIPTION = rule['description']
+                                updated_detectors.append(detector)
+                            except (KeyError, TypeError) as error:
+                                print(f"Skipping detector rule {rule.get('id')}: {error}")
+                        active_detectors = updated_detectors
+                        loaded_rules = rules
+                except Exception as error:
+                    print(f"Could not refresh detector rules: {error}")
+
             s.settimeout(push_interval)
             nbytes = s.recv_into(buffer)
             packet_view = view[:nbytes]
@@ -109,7 +137,7 @@ def packet_collector(result_queue: Queue, flow_queue: Queue):
             if flags is not None:
                 flows[packet_key]['flags'][flags] += 1
 
-            for detector in DETECTORS:
+            for detector in active_detectors:
                 result = detector.analyze(flows[packet_key])
                 if result:
                     result_queue.put(result)

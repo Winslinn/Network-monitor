@@ -68,9 +68,11 @@ function MainLayout({ setIsAuth }) {
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [rules, setRules] = useState([]);
   const [availableDetectors, setAvailableDetectors] = useState({});
+  const [canEditRules, setCanEditRules] = useState(false);
   const [showAddRule, setShowAddRule] = useState(false);
   const [newRule, setNewRule] = useState({
-    name: "", type: "pattern", severity: "medium", description: "", pattern: "",
+    name: "", detection_method: "pattern", detector_id: null,
+    severity: "medium", description: "", config: { pattern: "" },
   });
   const addingRuleRef = useRef(false);
   const [logs, setLogs] = useState([]);
@@ -90,10 +92,12 @@ function MainLayout({ setIsAuth }) {
     if (!newRule.name.trim() || addingRuleRef.current) return;
     addingRuleRef.current = true;
     try {
+      const rulePayload = { ...newRule };
+      if (rulePayload.detection_method === "detector") delete rulePayload.config;
       const response = await fetch(`${API_BASE}/api/rules`, {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRule),
+        body: JSON.stringify(rulePayload),
       });
       if (!response.ok) {
         addToast("Не вдалося додати правило", "high");
@@ -102,7 +106,10 @@ function MainLayout({ setIsAuth }) {
       const created = await response.json();
       setRules(prev => prev.some(rule => rule.id === created.id) ? prev : [...prev, created]);
       addToast(`Правило додано: ${created.name}`, "low");
-      setNewRule({ name: "", type: "custom", severity: "medium", description: "", pattern: "" });
+      setNewRule({
+        name: "", detection_method: "pattern", detector_id: null,
+        severity: "low", description: "", config: { pattern: "" },
+      });
       setShowAddRule(false);
     } finally {
       addingRuleRef.current = false;
@@ -216,11 +223,12 @@ function MainLayout({ setIsAuth }) {
       const r = bootstrap.router || {};
       setClients(bootstrap.dhcp || []);
       setRules(bootstrap.rules || []);
+      setCanEditRules((bootstrap.user?.permissions || []).includes("rules:edit"));
       setRouterInfo(prev => ({ ...prev, hostname: r.device_name || prev.hostname, ip: r.ip_address || "—", mac: r.mac_address || "—", dns: r.dns_server || "—" }));
       setAlerts(history || []);
-      const detectors = bootstrap.available_detectors || {};
+      const detectors = bootstrap.available_detectors || [];
       setAvailableDetectors({
-        ...Object.fromEntries(Object.entries(detectors).map(([k, d]) => [d.ID, d.TYPE]))
+        ...Object.fromEntries(detectors.map(detector => [detector.ID, detector]))
       });
 
       const initialPackets = {};
@@ -377,6 +385,7 @@ function MainLayout({ setIsAuth }) {
                 setNewRule={setNewRule} handleAddRule={handleAddRule}
                 apiBase={API_BASE}
                 availableDetectors={availableDetectors}
+                canEditRules={canEditRules}
               />
             )}
           </div>

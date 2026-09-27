@@ -79,7 +79,7 @@ export default function Alerts({ alerts, alertFilter, setAlertFilter, setAlerts,
                     <div className="alert-row-header">
                       <div className="alert-title-group">
                         <span className="alert-title">
-                          {availableDetectors[a.type] || a.type}
+                          {availableDetectors[a.type]?.TYPE || a.type}
                         </span>
                         {a.count > 1 && (
                           <Badge bg="danger" className="alert-count">

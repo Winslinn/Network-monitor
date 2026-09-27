@@ -1,7 +1,9 @@
+from sqlalchemy import true
 import sqlalchemy as sa
 import bcrypt
 
 from os import getenv
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker, DeclarativeBase, relationship, selectinload
 from sqlalchemy.inspection import inspect
 from sqlalchemy.dialects.sqlite import insert
@@ -111,10 +113,11 @@ class Rule(Base):
     __tablename__ = "rules"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column()
-    type: Mapped[str] = mapped_column()
+    detection_method: Mapped[str] = mapped_column()
+    detector_id: Mapped[Optional[str]] = mapped_column(nullable=True)
     severity: Mapped[str] = mapped_column(default="medium")
     description: Mapped[str] = mapped_column(default="")
-    pattern: Mapped[str] = mapped_column()
+    config: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     is_enabled: Mapped[bool] = mapped_column(default=True)
 
 class Flow(Base):
@@ -288,22 +291,94 @@ def get_clients() -> List[Dict[str, Any]]:
 def get_all_rules() -> List[Dict[str, Any]]:
     with Session() as session:
         rules = session.execute(sa.select(Rule)).scalars().all()
-        return [r.to_dict() for r in rules]
+        return [_public_rule_dict(rule) for rule in rules]
 
 
-def add_rule(rule_data: Dict[str, Any]) -> Dict[str, Any]:
+def get_rule_config(rule_id: int) -> Optional[Dict[str, Any]]:
+    """Return private config fields for an explicitly authorized config endpoint."""
+    with Session() as session:
+        rule = session.get(Rule, rule_id)
+        if rule is None:
+            return None
+        return {
+            "detection_method": rule.detection_method,
+            "detector_id": rule.detector_id,
+            "config": dict(rule.config or {}),
+        }
+
+
+def _public_rule_dict(rule: Rule) -> Dict[str, Any]:
+    rule_data = rule.to_dict()
+    rule_data.pop("config", None)
+    return rule_data
+
+
+def get_enabled_detector_rules() -> List[Dict[str, Any]]:
+    """Return private detector configs for the packet-processing worker."""
+    with Session() as session:
+        rules = session.execute(
+            sa.select(Rule)
+            .where(
+                Rule.detection_method == "detector",
+                Rule.is_enabled.is_(True),
+                Rule.detector_id.is_not(None),
+            )
+            .order_by(Rule.id)
+        ).scalars().all()
+        return [rule.to_dict() for rule in rules]
+
+
+def sync_detector_configs(detector_defaults: Dict[str, Dict[str, Any]]) -> None:
+    """Add newly declared defaults without replacing values already in the DB."""
+    if not detector_defaults:
+        return
+
+    with Session() as session:
+        rules = session.execute(
+            sa.select(Rule).where(Rule.detection_method == "detector")
+        ).scalars().all()
+
+        for rule in rules:
+            defaults = detector_defaults.get(rule.detector_id)
+            if defaults is None:
+                continue
+
+            stored_config = rule.config if isinstance(rule.config, dict) else {}
+            normalized_config = {}
+            for key, value in stored_config.items():
+                normalized_key = key.lower() if isinstance(key, str) else key
+                if normalized_key not in normalized_config or key == normalized_key:
+                    normalized_config[normalized_key] = value
+
+            merged_config = {**defaults, **normalized_config}
+            if merged_config != stored_config:
+                rule.config = merged_config
+
+        session.commit()
+
+
+def add_rule(
+    rule_data: Dict[str, Any],
+    detector_config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    config = (
+        dict(detector_config or {})
+        if rule_data.get("detection_method") == "detector"
+        else dict(rule_data.get("config") or {})
+    )
     with Session() as session:
         new_rule = Rule(
             name=rule_data.get("name"),
-            type=rule_data.get("type"),
+            detection_method=rule_data.get("detection_method"),
+            detector_id=rule_data.get("detector_id"),
             severity=rule_data.get("severity", "medium"),
             description=rule_data.get("description", ""),
-            pattern=rule_data.get("pattern"),
+            config=config,
             is_enabled=rule_data.get("is_enabled", True),
         )
         session.add(new_rule)
         session.commit()
-        return new_rule.to_dict()
+        return _public_rule_dict(new_rule)
 
 
 def delete_rule(rule_id: int):
@@ -319,11 +394,18 @@ def update_rule(rule_id: int, rule_data: Dict[str, Any]) -> Optional[Dict[str, A
         rule = session.get(Rule, rule_id)
         if not rule:
             return None
-        for field in ("name", "type", "severity", "description", "pattern", "is_enabled"):
-            if field in rule_data and rule_data[field] is not None:
-                setattr(rule, field, rule_data[field])
+        for field in (
+            "name", "detection_method", "detector_id", "severity",
+            "description", "config", "is_enabled",
+        ):
+            if field not in rule_data:
+                continue
+            value = rule_data[field]
+            if value is None and field != "detector_id":
+                continue
+            setattr(rule, field, value)
         session.commit()
-        return rule.to_dict()
+        return _public_rule_dict(rule)
 
 
 def get_flows() -> List[Dict[str, Any]]:

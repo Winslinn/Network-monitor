@@ -765,6 +765,53 @@ body {
   padding: 4px;
 }
 
+.rule-config-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  color: var(--nw-muted);
+  background: transparent;
+  border: 1px solid var(--nw-border);
+  border-radius: var(--nw-radius);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rule-config-toggle:hover {
+  color: var(--nw-text);
+  background: rgba(0, 0, 0, .03);
+}
+
+.rule-config-panel {
+  padding: 1rem 1rem 1rem 3.5rem;
+  background: rgba(0, 0, 0, .015);
+}
+
+.rule-config-panel.has-divider {
+  border-bottom: 1px solid var(--nw-border);
+}
+
+.rule-config-actions {
+  align-items: center;
+  margin-top: .75rem;
+}
+
+.rule-config-note,
+.rule-config-saved {
+  color: var(--nw-muted);
+  font-size: .75rem;
+}
+
+.rule-config-saved {
+  color: var(--nw-success);
+}
+
+.rule-config-error {
+  color: var(--nw-danger);
+  font-size: .8rem;
+}
+
 .delete-button:hover {
   color: var(--nw-danger);
 }
