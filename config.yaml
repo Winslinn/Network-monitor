@@ -2,3 +2,6 @@ router:
   ip: 192.168.0.238
   username: admin
   password: admin
+
+server:
+  address: https://192.168.0.229:8443
