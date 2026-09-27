@@ -14,10 +14,21 @@ import Rules from "./components/Rules";
 import Terminal from "./components/Terminal";
 import Login from "./components/Login";
 
-export const API_BASE = "https://potyshyi-server:8443";
-const WS_URL = "wss://potyshyi-server:8443/api/ws";
+export let API_BASE = window.location.origin;
 const RECONNECT_MS = 3001;
 const PING_INTERVAL = 20000;
+
+function configureApiBase(address) {
+  const parsedAddress = new URL(address, window.location.origin);
+  if (!["http:", "https:"].includes(parsedAddress.protocol)) {
+    throw new Error("server.address must use HTTP or HTTPS");
+  }
+  API_BASE = parsedAddress.origin;
+}
+
+function getWebSocketUrl() {
+  return `${API_BASE.replace(/^http/, "ws")}/api/ws`;
+}
 
 export function fmtDate(iso) {
   try {
@@ -159,7 +170,7 @@ function MainLayout({ setIsAuth }) {
   const connect = useCallback(() => {
     if (wsRef.current) wsRef.current.close();
     setWsStatus("connecting");
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(getWebSocketUrl());
     wsRef.current = ws;
     ws.onopen = () => {
       setWsStatus("ok");
@@ -379,15 +390,28 @@ function MainLayout({ setIsAuth }) {
 export default function App() {
   const [isAuth, setIsAuth] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+  const [apiConfigured, setApiConfigured] = useState(false);
 
   useEffect(() => {
+    fetch(`${window.location.origin}/api/config`)
+      .then(response => {
+        if (!response.ok) throw new Error("Could not load API configuration");
+        return response.json();
+      })
+      .then(({ address }) => configureApiBase(address))
+      .catch(() => { API_BASE = window.location.origin; })
+      .finally(() => setApiConfigured(true));
+  }, []);
+
+  useEffect(() => {
+    if (!apiConfigured) return;
     fetch(`${API_BASE}/api/session`, { credentials: "include" })
       .then(r => setIsAuth(r.ok))
       .catch(() => setIsAuth(false))
       .finally(() => setAuthChecking(false));
-  }, []);
+  }, [apiConfigured]);
 
-  if (authChecking) {
+  if (!apiConfigured || authChecking) {
     return (
       <div className="auth-loading">
         <Spinner animation="border" className="auth-spinner" />
@@ -401,7 +425,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" />} />
         <Route
           path="/login"
-          element={isAuth ? <Navigate to="/dashboard" /> : <Login onLoginSuccess={() => setIsAuth(true)} />}
+          element={isAuth ? <Navigate to="/dashboard" /> : <Login apiBase={API_BASE} onLoginSuccess={() => setIsAuth(true)} />}
         />
         <Route
           path="/dashboard"

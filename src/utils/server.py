@@ -1,8 +1,10 @@
 from sqlalchemy import true
 import asyncio, json, uvicorn, jwt, datetime
 import utils.database as db
+import yaml
 
 from os import getenv
+from urllib.parse import urlsplit
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Response, Cookie, HTTPException, status, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -18,6 +20,31 @@ from core.loader import get_detectors
 SECRET_KEY = getenv("SECRET_KEY")
 ALGORITHM = getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+PROJECT_ROOT = getenv("PROJECT_ROOT")
+
+with open(f"{PROJECT_ROOT}/config.yaml", "r") as config_file:
+    app_config = yaml.safe_load(config_file)
+
+SERVER_ADDRESS = app_config["server"]["address"].strip()
+server_url = urlsplit(SERVER_ADDRESS)
+if (
+    server_url.scheme not in {"http", "https"}
+    or not server_url.hostname
+    or server_url.username
+    or server_url.password
+    or server_url.path not in {"", "/"}
+    or server_url.query
+    or server_url.fragment
+):
+    raise ValueError("server.address must be an HTTP(S) origin without credentials or a path")
+
+SERVER_ADDRESS = f"{server_url.scheme}://{server_url.netloc}"
+
+server_host = f"[{server_url.hostname}]" if ":" in server_url.hostname else server_url.hostname
+SERVER_DEV_ORIGINS = [
+    f"{scheme}://{server_host}:3001"
+    for scheme in ("http", "https")
+]
 
 class LoginRequest(BaseModel):
     username: str
@@ -53,8 +80,8 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://potyshyi-server:3001", 
-        "https://potyshyi-server",
+        SERVER_ADDRESS,
+        *SERVER_DEV_ORIGINS,
         "https://100.101.30.34",
         "https://192.168.0.240"
     ], 
@@ -87,6 +114,11 @@ class ConnectionManager:
             )
 
 manager = ConnectionManager()
+
+
+@app.get("/api/config")
+async def get_client_config():
+    return {"address": SERVER_ADDRESS}
 
 def create_access_token(data: dict):
     to_encode = data.copy()

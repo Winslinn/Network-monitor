@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Lock, User, Eye, EyeOff } from "lucide-react";
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, apiBase }) {
   const [username, setUsername]       = useState("");
   const [password, setPassword]       = useState("");
   const [showPass, setShowPass]       = useState(false);
@@ -13,7 +13,7 @@ export default function Login({ onLoginSuccess }) {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("https://potyshyi-server:8443/api/login", {
+      const res = await fetch(`${apiBase}/api/login`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
