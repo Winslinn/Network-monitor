@@ -30,6 +30,10 @@ function getWebSocketUrl() {
   return `${API_BASE.replace(/^http/, "ws")}/api/ws`;
 }
 
+function getLogKey(log) {
+  return `${log.id || ""}|${log.timestamp || log.time || ""}|${log.topics || ""}|${log.message || ""}`;
+}
+
 export function fmtDate(iso) {
   try {
     const d = new Date(iso);
@@ -119,9 +123,15 @@ function MainLayout({ setIsAuth }) {
   const handleMessage = useCallback((msg) => {
     const ctx = msg.context;
     if (ctx === "stats") setRouterInfo(prev => ({ ...prev, ...msg }));
-    else if (ctx === "log") setLogs(prev => [...prev.slice(-199), {
-      ...msg.data, timestamp: new Date().toISOString(), id: Date.now() + Math.random(),
-    }]);
+    else if (ctx === "log") setLogs(prev => {
+      const entry = {
+        ...msg.data,
+        timestamp: msg.data.timestamp || msg.data.time || new Date().toISOString(),
+      };
+      const key = getLogKey(entry);
+      if (prev.some(log => getLogKey(log) === key)) return prev;
+      return [...prev.slice(-199), entry];
+    });
     else if (ctx === "dhcp") setClients(prev => {
       const exists = prev.find(c => c.id === msg.data.id);
       return exists ? prev.map(c => c.id === msg.data.id ? msg.data : c) : [...prev, msg.data];
@@ -210,7 +220,8 @@ function MainLayout({ setIsAuth }) {
       fetch(`${API_BASE}/api/bootstrap`, { credentials: "include" }),
       fetch(`${API_BASE}/api/alerts`, { credentials: "include" }),
       fetch(`${API_BASE}/api/flows`, { credentials: "include" }),
-    ]).then(async ([bootstrapResponse, alertsResponse, flowsResponse]) => {
+      fetch(`${API_BASE}/api/logs`, { credentials: "include" }),
+    ]).then(async ([bootstrapResponse, alertsResponse, flowsResponse, logsResponse]) => {
       if (bootstrapResponse.status === 401) {
         setIsAuth(false);
         navigate("/login");
@@ -219,6 +230,7 @@ function MainLayout({ setIsAuth }) {
       const bootstrap = await bootstrapResponse.json();
       const history = alertsResponse.ok ? await alertsResponse.json() : [];
       const storedFlows = flowsResponse.ok ? await flowsResponse.json() : [];
+      const storedLogs = logsResponse.ok ? await logsResponse.json() : [];
       if (cancelled) return;
       const r = bootstrap.router || {};
       setClients(bootstrap.dhcp || []);
@@ -226,6 +238,11 @@ function MainLayout({ setIsAuth }) {
       setCanEditRules((bootstrap.user?.permissions || []).includes("rules:edit"));
       setRouterInfo(prev => ({ ...prev, hostname: r.device_name || prev.hostname, ip: r.ip_address || "—", mac: r.mac_address || "—", dns: r.dns_server || "—" }));
       setAlerts(history || []);
+      setLogs(prev => {
+        const unique = new Map();
+        [...(storedLogs || []), ...prev].forEach(log => unique.set(getLogKey(log), log));
+        return [...unique.values()].slice(-200);
+      });
       const detectors = bootstrap.available_detectors || [];
       setAvailableDetectors({
         ...Object.fromEntries(detectors.map(detector => [detector.ID, detector]))

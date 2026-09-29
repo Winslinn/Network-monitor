@@ -100,6 +100,7 @@ export default function Terminal({
                   <span className="log-time">
                     [{new Date(log.timestamp).toLocaleTimeString("uk-UA")}]
                   </span>
+                  {log.topics && <span className="log-topic">{log.topics}</span>}
                   <span className={`log-message ${log.type === "alert" ? "alert-log" : ""}`}>
                     {log.message}
                   </span>

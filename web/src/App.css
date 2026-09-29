@@ -1148,9 +1148,15 @@ body {
   flex-shrink: 0;
 }
 
+.log-topic {
+  color: var(--nw-info);
+  flex-shrink: 0;
+}
+
 .log-message {
   color: var(--nw-text);
   font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .log-message.alert-log {

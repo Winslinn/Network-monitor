@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from utils.database import Session, Router, init_db
 from utils.logmanager import watch_flows, watch_results
-from core.router import init as init_router, router_manager
+from core.router import init as init_router, router_manager, watch_router_logs
 from utils.snmp import close_snmp
 from core.loader import get_detector_config, get_detectors
 
@@ -81,10 +81,18 @@ class RuleConfigUpdate(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(init_router(manager))
-    yield
-    task.cancel()
-    close_snmp()
+    tasks = [
+        asyncio.create_task(init_router(manager)),
+        asyncio.create_task(watch_router_logs(manager)),
+    ]
+    try:
+        yield
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        router_manager.close()
+        close_snmp()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -360,8 +368,10 @@ async def get_flows(user=Depends(current_user), from_time: Optional[float] = Que
 
 @app.get("/api/logs")
 async def get_logs(user=Depends(current_user), from_time: Optional[str] = Query(default=None, alias="from")):
-    # Logs are currently transient events; websocket is the source of truth for live data.
-    return []
+    logs = router_manager.data.get("logs", [])
+    if from_time is None:
+        return logs
+    return [entry for entry in logs if entry.get("timestamp", "") >= from_time]
 
 
 @app.get("/api/bootstrap")

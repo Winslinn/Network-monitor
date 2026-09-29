@@ -1,4 +1,6 @@
 import asyncio, yaml
+from collections import deque
+from datetime import datetime, timezone
 
 from os import getenv
 from librouteros import connect
@@ -13,6 +15,19 @@ with open(f'{PROJECT_ROOT}/config.yaml', 'r') as f:
 
 class RouterManager:
     def __init__(self):
+        self.connection = None
+        self.data = {'logs': []}
+        self._seen_log_keys = set()
+        self._seen_log_order = deque()
+        self._logs_initialized = False
+        self._providers = {
+            'arp': self._fetch_arp,
+            'interfaces': self._fetch_interfaces,
+            'network_info': self._fetch_network_info,
+            'router_db': self._fetch_router_db,
+            'dhcp': self._fetch_dhcp
+        }
+
         try:
             self.host = config['router']['ip']
             self.username = config['router']['username']
@@ -24,20 +39,8 @@ class RouterManager:
                 password=self.password,
                 timeout=10
             )
-            self.data = {}
-            
-            self._providers = {
-                'arp': self._fetch_arp,
-                'interfaces': self._fetch_interfaces,
-                'network_info': self._fetch_network_info,
-                'router_db': self._fetch_router_db,
-                'dhcp': self._fetch_dhcp
-            }
         except Exception as e:
             print(f"Error initializing RouterManager: {e}")
-            self.connection = None
-            self.data = {}
-            self._providers = {}
         
     def _get_connection(self):
         if self.connection is None:
@@ -50,12 +53,70 @@ class RouterManager:
         return self.connection
 
     def reset_connection(self):
-        self.connection = None
+        connection, self.connection = self.connection, None
+        if connection is not None:
+            close = getattr(connection, 'close', None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as e:
+                    print(f"Error closing router connection: {e}")
+
+    def close(self):
+        self.reset_connection()
+
+    @staticmethod
+    def _log_timestamp(value):
+        if value:
+            for date_format in ('%b/%d/%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S'):
+                try:
+                    return datetime.strptime(str(value), date_format).isoformat()
+                except ValueError:
+                    pass
+        return datetime.now(timezone.utc).isoformat()
+
+    def _remember_log(self, key):
+        if key in self._seen_log_keys:
+            return False
+
+        self._seen_log_keys.add(key)
+        self._seen_log_order.append(key)
+        while len(self._seen_log_order) > 2000:
+            self._seen_log_keys.discard(self._seen_log_order.popleft())
+        return True
+
+    def fetch_logs(self):
+        rows = list(
+            self._get_connection().path('log')
+            .select('.id', 'time', 'topics', 'message')
+        )
+        entries = []
+        for row in rows:
+            log_id = str(row.get('.id') or '')
+            log_time = str(row.get('time') or '')
+            topics = str(row.get('topics') or '')
+            message = str(row.get('message') or '')
+            key = '\x1f'.join((log_id, log_time, topics, message))
+            if self._remember_log(key):
+                entries.append({
+                    'id': log_id or key,
+                    'timestamp': self._log_timestamp(log_time),
+                    'topics': topics,
+                    'message': message,
+                })
+
+        if not self._logs_initialized:
+            entries = entries[-200:]
+            self._logs_initialized = True
+
+        if entries:
+            self.data['logs'] = (self.data.get('logs', []) + entries)[-200:]
+        return entries
         
     def _fetch_arp(self):
         try:
             self.data['arp'] = list(
-                self.connection.path('ip', 'arp')
+                self._get_connection().path('ip', 'arp')
                 .select('address', 'mac-address', 'interface', 'status')
             )
         except Exception as e:
@@ -64,21 +125,22 @@ class RouterManager:
     
     def _fetch_dhcp(self):
         self.data['dhcp'] = list(
-            self.connection.path('ip', 'dhcp-server', 'lease')
+            self._get_connection().path('ip', 'dhcp-server', 'lease')
             .select('address', 'mac-address', 'host-name', 'status')
         )
 
     def _fetch_interfaces(self):
         self.data['interfaces'] = list(
-            self.connection.path('interface')
+            self._get_connection().path('interface')
             .select('name', 'type')
         )
         self.data.setdefault('prev_rx_bytes', 0)
         self.data.setdefault('prev_tx_bytes', 0)
 
     def _fetch_network_info(self):
-        ethernet = self.connection.path('interface', 'ethernet')
-        addresses = list(self.connection.path('ip', 'address').select('address'))
+        connection = self._get_connection()
+        ethernet = connection.path('interface', 'ethernet')
+        addresses = list(connection.path('ip', 'address').select('address'))
         
         self.data['wan_address'] = addresses[1]['address']
         self.data['lan_address'] = addresses[0]['address']
@@ -125,12 +187,27 @@ class RouterManager:
                     
         except (LibRouterosError, Exception) as e:
             print(f'Error fetching data from router (providers_target={targets}, problematic provider={provider}) : {e}')
+            self.reset_connection()
         
 
 router_manager = RouterManager()
 router_lock = asyncio.Lock()
 
-import asyncio
+
+async def watch_router_logs(manager):
+    while True:
+        try:
+            async with router_lock:
+                entries = await asyncio.to_thread(router_manager.fetch_logs)
+            for entry in entries:
+                await manager.broadcast({'context': 'log', 'data': entry})
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"Error fetching router logs: {e}")
+            async with router_lock:
+                await asyncio.to_thread(router_manager.reset_connection)
+        await asyncio.sleep(2)
 
 async def check_active_clients(manager):
     while True:
@@ -259,7 +336,8 @@ async def init(manager):
                 )
         except Exception as e:
             print(f"Error fetching interface speeds: {e}")
-            router_manager.reset_connection()
+            async with router_lock:
+                await asyncio.to_thread(router_manager.reset_connection)
         
         stats = next(
             (item for item in all_interfaces if item.get('type') == 'bridge'),
